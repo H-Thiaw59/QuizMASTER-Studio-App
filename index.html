@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuizMaster — Testez vos connaissances</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: rgba(255,255,255,0.07);
+    --accent: #7c3aed;
+    --accent2: #06b6d4;
+    --accent3: #f59e0b;
+    --text: #f0f0f8;
+    --text-muted: #6b7280;
+    --correct: #10b981;
+    --wrong: #ef4444;
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  .bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.15;
+    animation: float 8s ease-in-out infinite;
+  }
+  .orb-1 { width: 500px; height: 500px; background: var(--accent); top: -10%; left: -10%; animation-delay: 0s; }
+  .orb-2 { width: 400px; height: 400px; background: var(--accent2); bottom: -5%; right: -5%; animation-delay: -3s; }
+  .orb-3 { width: 300px; height: 300px; background: var(--accent3); top: 40%; left: 60%; animation-delay: -6s; }
+  @keyframes float {
+    0%, 100% { transform: translate(0,0) scale(1); }
+    33% { transform: translate(30px,-30px) scale(1.05); }
+    66% { transform: translate(-20px,20px) scale(0.95); }
+  }
+
+  /* Noise overlay */
+  .bg-canvas::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  /* SCREENS */
+  .screen { display: none; width: 100%; max-width: 720px; animation: slideIn 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  .screen.active { display: block; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(30px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 48px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  /* HOME SCREEN */
+  .home-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(124,58,237,0.15);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #a78bfa;
+    margin-bottom: 32px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .home-badge::before { content: '✦'; }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(48px, 8vw, 80px);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+  }
+  h1 span {
+    background: linear-gradient(135deg, #7c3aed, #06b6d4, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .home-desc {
+    color: var(--text-muted);
+    font-size: 18px;
+    line-height: 1.6;
+    max-width: 480px;
+    margin-bottom: 48px;
+  }
+
+  /* CATEGORY GRID */
+  .cat-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .cat-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .cat-btn .cat-emoji { font-size: 28px; display: block; margin-bottom: 8px; }
+  .cat-btn:hover { border-color: var(--accent); background: rgba(124,58,237,0.1); transform: translateY(-2px); }
+  .cat-btn.selected { border-color: var(--accent); background: rgba(124,58,237,0.2); box-shadow: 0 0 20px rgba(124,58,237,0.3); }
+
+  /* DIFFICULTY */
+  .diff-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 40px;
+  }
+  .diff-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .diff-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+  .diff-btn.selected { color: var(--text); }
+  .diff-btn[data-diff="facile"].selected { border-color: var(--correct); background: rgba(16,185,129,0.15); color: var(--correct); }
+  .diff-btn[data-diff="moyen"].selected { border-color: var(--accent3); background: rgba(245,158,11,0.15); color: var(--accent3); }
+  .diff-btn[data-diff="difficile"].selected { border-color: var(--wrong); background: rgba(239,68,68,0.15); color: var(--wrong); }
+
+  /* BUTTONS */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #7c3aed, #5b21b6);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    padding: 18px 36px;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 8px 32px rgba(124,58,237,0.4);
+    width: 100%;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(124,58,237,0.5); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 24px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+  /* QUIZ SCREEN */
+  .quiz-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .quiz-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .quiz-cat-tag {
+    background: rgba(124,58,237,0.2);
+    border: 1px solid rgba(124,58,237,0.3);
+    color: #a78bfa;
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .q-counter {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .score-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .score-display .star { color: var(--accent3); }
+
+  /* TIMER */
+  .timer-wrap {
+    margin-bottom: 28px;
+  }
+  .timer-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 100px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .timer-bar {
+    height: 100%;
+    border-radius: 100px;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    transition: width 1s linear, background 0.5s;
+  }
+  .timer-bar.warning { background: linear-gradient(90deg, var(--accent3), var(--wrong)); }
+  .timer-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* PROGRESS */
+  .progress-dots {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+  .pdot {
+    width: 28px;
+    height: 6px;
+    border-radius: 100px;
+    background: var(--surface2);
+    transition: all 0.3s;
+  }
+  .pdot.current { background: var(--accent); width: 40px; box-shadow: 0 0 10px var(--accent); }
+  .pdot.correct { background: var(--correct); }
+  .pdot.wrong { background: var(--wrong); }
+
+  /* QUESTION */
+  .question-num {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .question-text {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(20px, 3vw, 26px);
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 32px;
+    letter-spacing: -0.01em;
+  }
+
+  /* OPTIONS */
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .option-btn {
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    cursor: pointer;
+    text-align: left;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .option-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(124,58,237,0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .option-btn:hover:not(:disabled)::before { opacity: 1; }
+  .option-btn:hover:not(:disabled) { border-color: rgba(124,58,237,0.5); transform: translateY(-1px); }
+  .option-btn:disabled { cursor: default; }
+
+  .opt-letter {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+
+  .option-btn.correct { border-color: var(--correct); background: rgba(16,185,129,0.1); }
+  .option-btn.correct .opt-letter { background: var(--correct); border-color: var(--correct); color: white; }
+  .option-btn.wrong { border-color: var(--wrong); background: rgba(239,68,68,0.1); }
+  .option-btn.wrong .opt-letter { background: var(--wrong); border-color: var(--wrong); color: white; }
+  .option-btn.selected-correct { animation: bounceCorrect 0.5s; }
+  .option-btn.selected-wrong { animation: shakeWrong 0.4s; }
+  @keyframes bounceCorrect {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  @keyframes shakeWrong {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    60% { transform: translateX(6px); }
+  }
+
+  /* FEEDBACK */
+  .feedback-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    display: none;
+    animation: fadeUp 0.3s;
+  }
+  .feedback-panel.show { display: flex; align-items: flex-start; gap: 16px; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .feedback-icon { font-size: 28px; flex-shrink: 0; }
+  .feedback-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+  .feedback-title.correct-text { color: var(--correct); }
+  .feedback-title.wrong-text { color: var(--wrong); }
+  .feedback-explain { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+
+  .quiz-actions { display: flex; gap: 12px; }
+
+  /* RESULTS SCREEN */
+  .result-hero {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .score-ring-wrap {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    margin: 0 auto 28px;
+  }
+  .score-ring-svg { transform: rotate(-90deg); }
+  .score-ring-bg { fill: none; stroke: var(--surface2); stroke-width: 12; }
+  .score-ring-fill {
+    fill: none;
+    stroke-width: 12;
+    stroke-linecap: round;
+    stroke-dasharray: 502;
+    stroke-dashoffset: 502;
+    transition: stroke-dashoffset 1.5s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .score-ring-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .score-pct {
+    font-family: 'Syne', sans-serif;
+    font-size: 44px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .score-pct-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  .result-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .result-subtitle { color: var(--text-muted); font-size: 16px; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-label { font-size: 13px; color: var(--text-muted); }
+  .stat-card.good .stat-value { color: var(--correct); }
+  .stat-card.bad .stat-value { color: var(--wrong); }
+  .stat-card.neutral .stat-value { color: var(--accent2); }
+
+  /* REVIEW */
+  .review-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+  }
+  .review-item.correct-item { border-left: 3px solid var(--correct); }
+  .review-item.wrong-item { border-left: 3px solid var(--wrong); }
+  .review-q { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 15px; margin-bottom: 12px; line-height: 1.4; }
+  .review-answers { display: flex; flex-direction: column; gap: 6px; }
+  .review-ans {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 8px;
+  }
+  .review-ans.correct-ans { background: rgba(16,185,129,0.1); color: var(--correct); }
+  .review-ans.wrong-ans { background: rgba(239,68,68,0.1); color: var(--wrong); }
+  .review-ans.neutral-ans { color: var(--text-muted); }
+  .review-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.06);
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .result-actions { display: flex; gap: 12px; }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 28px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* STREAK */
+  .streak-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(239,68,68,0.1));
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-size: 15px;
+    font-weight: 500;
+  }
+  .streak-fire { font-size: 28px; }
+
+  /* CONFETTI */
+  .confetti-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    top: -20px;
+    border-radius: 2px;
+    animation: confettiFall linear forwards;
+  }
+  @keyframes confettiFall {
+    to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 600px) {
+    .card { padding: 28px 20px; border-radius: 20px; }
+    .category-grid { grid-template-columns: repeat(2, 1fr); }
+    .options-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr; }
+    .result-actions { flex-direction: column; }
+    h1 { font-size: 40px; }
+  }
+
+  /* TRANSITIONS */
+  .fade-enter { animation: fadeEnter 0.3s; }
+  @keyframes fadeEnter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-canvas">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+<div class="confetti-container" id="confettiContainer"></div>
+
+<div class="app">
+
+  <!-- HOME SCREEN -->
+  <div class="screen active" id="homeScreen">
+    <div class="card">
+      <div class="home-badge">Quiz Master</div>
+      <h1>Testez vos<br><span>connaissances</span></h1>
+      <p class="home-desc">Choisissez une catégorie, sélectionnez votre niveau et prouvez votre expertise en répondant à des questions soigneusement sélectionnées.</p>
+
+      <div class="cat-label">Catégorie</div>
+      <div class="category-grid" id="catGrid">
+        <button class="cat-btn" data-cat="science"><span class="cat-emoji">🔬</span>Sciences</button>
+        <button class="cat-btn" data-cat="histoire"><span class="cat-emoji">🏛️</span>Histoire</button>
+        <button class="cat-btn" data-cat="geo"><span class="cat-emoji">🌍</span>Géographie</button>
+        <button class="cat-btn" data-cat="tech"><span class="cat-emoji">💻</span>Technologie</button>
+        <button class="cat-btn" data-cat="culture"><span class="cat-emoji">🎨</span>Culture</button>
+        <button class="cat-btn" data-cat="sport"><span class="cat-emoji">⚽</span>Sport</button>
+      </div>
+
+      <div class="cat-label">Difficulté</div>
+      <div class="diff-row" id="diffRow">
+        <button class="diff-btn" data-diff="facile">😊 Facile</button>
+        <button class="diff-btn selected" data-diff="moyen">🎯 Moyen</button>
+        <button class="diff-btn" data-diff="difficile">🔥 Difficile</button>
+      </div>
+
+      <button class="btn-primary" id="startBtn" disabled>
+        Commencer le Quiz →
+      </button>
+    </div>
+  </div>
+
+  <!-- QUIZ SCREEN -->
+  <div class="screen" id="quizScreen">
+    <div class="card">
+      <div class="quiz-header">
+        <div class="quiz-meta">
+          <span class="quiz-cat-tag" id="quizCatTag">Science</span>
+          <span class="q-counter" id="qCounter">Q 1 / 10</span>
+        </div>
+        <div class="score-display">
+          <span class="star">★</span>
+          <span id="liveScore">0</span>
+        </div>
+      </div>
+
+      <div class="timer-wrap">
+        <div class="timer-bar-bg"><div class="timer-bar" id="timerBar"></div></div>
+        <div class="timer-text">
+          <span>Temps restant</span>
+          <span id="timerText">20s</span>
+        </div>
+      </div>
+
+      <div class="progress-dots" id="progressDots"></div>
+
+      <div class="question-num" id="questionNum">Question 1</div>
+      <div class="question-text" id="questionText"></div>
+
+      <div class="options-grid" id="optionsGrid"></div>
+
+      <div class="feedback-panel" id="feedbackPanel">
+        <div class="feedback-icon" id="feedbackIcon"></div>
+        <div>
+                    <div class="feedback-title" id="feedbackTitle"></div>
+          <div class="feedback-explain" id="feedbackExplain"></div>
+        </div>
+      </div>
+
+      <div class="quiz-actions">
+        <button class="btn-secondary" id="skipBtn">Passer</button>
+        <button class="btn-primary" id="nextBtn" disabled style="flex:1">Suivant →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div class="screen" id="resultsScreen">
+    <div class="card">
+      <div class="result-hero">
+        <div class="score-ring-wrap">
+          <svg class="score-ring-svg" width="180" height="180" viewBox="0 0 180 180">
+            <circle class="score-ring-bg" cx="90" cy="90" r="80"/>
+            <circle class="score-ring-fill" id="scoreRing" cx="90" cy="90" r="80"/>
+          </svg>
+          <div class="score-ring-inner">
+            <div class="score-pct" id="scorePct">0%</div>
+            <div class="score-pct-label">Score final</div>
+          </div>
+        </div>
+        <div class="result-title" id="resultTitle">Excellent travail!</div>
+        <div class="result-subtitle" id="resultSubtitle"></div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" onclick="showTab('stats')">📊 Stats</button>
+        <button class="tab-btn" onclick="showTab('review')">🔍 Révision</button>
+      </div>
+
+      <div class="tab-content active" id="statsTab">
+        <div class="stats-grid">
+          <div class="stat-card good">
+            <div class="stat-value" id="correctCount">0</div>
+            <div class="stat-label">Bonnes réponses</div>
+          </div>
+          <div class="stat-card bad">
+            <div class="stat-value" id="wrongCount">0</div>
+            <div class="stat-label">Mauvaises réponses</div>
+          </div>
+          <div class="stat-card neutral">
+            <div class="stat-value" id="timeUsed">0s</div>
+            <div class="stat-label">Temps moyen/q.</div>
+          </div>
+        </div>
+        <div class="streak-banner" id="streakBanner" style="display:none">
+          <span class="streak-fire">🔥</span>
+          <span id="streakText">Super série !</span>
+        </div>
+      </div>
+
+      <div class="tab-content" id="reviewTab">
+        <div id="reviewList"></div>
+      </div>
+
+      <div class="result-actions">
+        <button class="btn-secondary" id="homeBtn">← Accueil</button>
+        <button class="btn-primary" id="retryBtn" style="flex:1">Rejouer ↺</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const QUESTIONS = {
+  science: {
+    facile: [
+      { q: "Quelle planète est la plus proche du Soleil ?", opts: ["Mercure","Vénus","Mars","Jupiter"], ans: 0, exp: "Mercure est la planète la plus proche du Soleil avec une orbite d'environ 58 millions de km." },
+      { q: "Quel est le symbole chimique de l'eau ?", opts: ["H2O","CO2","O2","HO"], ans: 0, exp: "L'eau est composée de 2 atomes d'hydrogène et 1 atome d'oxygène, d'où H₂O." },
+      { q: "Combien d'os contient le corps humain adulte ?", opts: ["206","208","204","210"], ans: 0, exp: "Le squelette humain adulte compte 206 os, contre 270-350 à la naissance." },
+      { q: "Quelle est la vitesse de la lumière dans le vide ?", opts: ["300 000 km/s","150 000 km/s","500 000 km/s","200 000 km/s"], ans: 0, exp: "La lumière se déplace à environ 299 792 km/s dans le vide." },
+      { q: "Quel gaz représente 78% de l'atmosphère terrestre ?", opts: ["Azote","Oxygène","CO2","Argon"], ans: 0, exp: "L'azote (N₂) constitue environ 78% de l'atmosphère, l'oxygène 21%." },
+      { q: "Quel est le plus grand organe du corps humain ?", opts: ["La peau","Le foie","Le cœur","Les poumons"], ans: 0, exp: "La peau est le plus grand organe avec une superficie d'environ 2m²." },
+      { q: "Comment s'appelle le noyau d'une cellule qui contient l'ADN ?", opts: ["Noyau","Mitochondrie","Ribosome","Cytoplasme"], ans: 0, exp: "Le noyau cellulaire est l'organite qui contient le matériel génétique (ADN)." },
+      { q: "Quel scientifique a développé la théorie de la relativité ?", opts: ["Albert Einstein","Isaac Newton","Niels Bohr","Marie Curie"], ans: 0, exp: "Albert Einstein a développé la théorie de la relativité spéciale (1905) et générale (1915)." },
+      { q: "De quoi est composé le Soleil principalement ?", opts: ["Hydrogène et Hélium","Oxygène et Carbone","Azote et Argon","Fer et Nickel"], ans: 0, exp: "Le Soleil est composé à 73% d'hydrogène et 25% d'hélium." },
+      { q: "Quelle est la formule chimique du sel de table ?", opts: ["NaCl","KCl","MgCl2","CaCl2"], ans: 0, exp: "Le sel de table est du chlorure de sodium, de formule NaCl." },
+    ],
+    moyen: [
+      { q: "Quel scientifique a découvert la pénicilline ?", opts: ["Alexander Fleming","Louis Pasteur","Robert Koch","Paul Ehrlich"], ans: 0, exp: "Alexander Fleming a découvert la pénicilline en 1928 en observant qu'une moisissure détruisait des bactéries." },
+      { q: "Quelle particule donne à un atome sa charge électrique positive ?", opts: ["Proton","Neutron","Électron","Photon"], ans: 0, exp: "Le proton porte une charge électrique positive (+1). L'électron porte la charge négative." },
+      { q: "Quel est le pH neutre d'une solution aqueuse ?", opts: ["7","0","14","5"], ans: 0, exp: "Un pH de 7 est neutre. En dessous c'est acide, au-dessus c'est basique." },
+      { q: "Combien de chromosomes possède une cellule humaine normale ?", opts: ["46","23","48","44"], ans: 0, exp: "Les cellules humaines ont 46 chromosomes regroupés en 23 paires." },
+      { q: "Quel est le principal gaz à effet de serre d'origine humaine ?", opts: ["CO2","Méthane","N2O","Vapeur d'eau"], ans: 0, exp: "Le CO2 est le principal gaz à effet de serre d'origine anthropique, représentant ~76% des émissions." },
+      { q: "En biologie, qu'est-ce que la mitose ?", opts: ["Division cellulaire","Respiration","Photosynthèse","Digestion"], ans: 0, exp: "La mitose est le processus de division cellulaire permettant de produire deux cellules filles identiques." },
+      { q: "Quelle est la loi physique qui décrit les gaz idéaux ?", opts: ["PV = nRT","F = ma","E = mc²","V = IR"], ans: 0, exp: "PV=nRT est la loi des gaz parfaits, où P=pression, V=volume, n=moles, R=constante, T=température." },
+      { q: "Quel élément a le numéro atomique 1 ?", opts: ["Hydrogène","Hélium","Lithium","Carbone"], ans: 0, exp: "L'hydrogène (H) est l'élément de numéro atomique 1, le plus simple et le plus abondant." },
+      { q: "Qu'est-ce que la photosynthèse produit en plus du glucose ?", opts: ["Oxygène","CO2","Azote","Eau"], ans: 0, exp: "La photosynthèse produit du glucose et de l'oxygène à partir de CO2 et d'eau, grâce à la lumière." },
+      { q: "Quel type de radiation a la longueur d'onde la plus courte ?", opts: ["Rayons gamma","Rayons X","UV","Visible"], ans: 0, exp: "Les rayons gamma ont les longueurs d'onde les plus courtes (<0.01 nm) et les plus hautes énergies." },
+    ],
+    difficile: [
+      { q: "Quel est le principe d'incertitude d'Heisenberg ?", opts: ["Δx·Δp ≥ ħ/2","E = mc²","F = ma","PV = nRT"], ans: 0, exp: "Le principe d'Heisenberg stipule qu'on ne peut connaître simultanément la position et la quantité de mouvement d'une particule." },
+      { q: "Quel phénomène quantique permet la superposition d'états ?", opts: ["Superposition quantique","Intrication","Décoherence","Tunneling"], ans: 0, exp: "La superposition quantique permet à une particule d'exister dans plusieurs états simultanément jusqu'à la mesure." },
+      { q: "Quelle enzyme est responsable de la synthèse de l'ADN ?", opts: ["ADN polymérase","ARN polymérase","Ligase","Hélicase"], ans: 0, exp: "L'ADN polymérase synthétise de nouveaux brins d'ADN en utilisant la matrice existante." },
+      { q: "Que mesure la constante de Planck ?", opts: ["Quantum d'action","Vitesse lumière","Charge électron","Masse proton"], ans: 0, exp: "h ≈ 6.626×10⁻³⁴ J·s est la constante quantique d'action, fondamentale en mécanique quantique." },
+      { q: "Quel est le nom de la force qui lie les quarks dans un proton ?", opts: ["Force chrodynamique","Force faible","Force électromagnétique","Gravité"], ans: 0, exp: "La chromodynamique quantique (QCD) décrit l'interaction forte entre quarks via les gluons." },
+      { q: "Dans quel organite se déroule le cycle de Krebs ?", opts: ["Mitochondrie","Chloroplaste","Réticulum","Noyau"], ans: 0, exp: "Le cycle de Krebs (cycle de l'acide citrique) se déroule dans la matrice mitochondriale." },
+      { q: "Quelle est la valeur approximative de la constante de Hubble ?", opts: ["70 km/s/Mpc","100 km/s/Mpc","50 km/s/Mpc","200 km/s/Mpc"], ans: 0, exp: "La constante de Hubble H₀ ≈ 67-73 km/s/Mpc décrit l'expansion de l'univers." },
+      { q: "Qu'est-ce que l'effet tunnel en physique quantique ?", opts: ["Passer une barrière d'énergie","Dualité onde-corpuscule","Intrication quantique","Superposition d'états"], ans: 0, exp: "L'effet tunnel permet à une particule de traverser une barrière d'énergie classiquement infranchissable." },
+      { q: "Quel type de liaison chimique est la plus forte ?", opts: ["Covalente","Ionique","Hydrogène","Van der Waals"], ans: 0, exp: "Les liaisons covalentes (partage d'électrons) sont généralement les plus fortes, surtout C-C et C-H." },
+      { q: "La constante d'Avogadro représente :", opts: ["Nb de particules par mole","Charge d'un électron","Masse d'un proton","Constante des gaz"], ans: 0, exp: "Nₐ ≈ 6.022×10²³ est le nombre d'entités (atomes, molécules) dans une mole de substance." },
+    ]
+  },
+  histoire: {
+    facile: [
+      { q: "En quelle année a débuté la Première Guerre Mondiale ?", opts: ["1914","1918","1939","1910"], ans: 0, exp: "La Première Guerre Mondiale a commencé le 28 juillet 1914 avec la déclaration de guerre de l'Autriche-Hongrie à la Serbie." },
+      { q: "Qui était le premier président des États-Unis ?", opts: ["George Washington","Abraham Lincoln","Thomas Jefferson","John Adams"], ans: 0, exp: "George Washington fut le premier président américain, en fonction de 1789 à 1797." },
+      { q: "Où s'est déroulé le débarquement du 6 juin 1944 ?", opts: ["Normandie","Bretagne","Provence","Pas-de-Calais"], ans: 0, exp: "L'Opération Overlord a eu lieu en Normandie, avec des plages comme Omaha Beach et Utah Beach." },
+      { q: "Quel empire était gouverné par Jules César ?", opts: ["Romain","Grec","Perse","Égyptien"], ans: 0, exp: "Jules César était général et dictateur de la République romaine avant son assassinat en 44 av. J.-C." },
+      { q: "En quelle année a chuté le mur de Berlin ?", opts: ["1989","1991","1985","1990"], ans: 0, exp: "Le mur de Berlin est tombé le 9 novembre 1989, marquant la fin de la Guerre Froide." },
+      { q: "Qui a peint La Joconde ?", opts: ["Léonard de Vinci","Michel-Ange","Raphaël","Botticelli"], ans: 0, exp: "La Joconde (Mona Lisa) a été peinte par Léonard de Vinci entre 1503 et 1519." },
+      { q: "Quelle civilisation a construit les pyramides de Gizeh ?", opts: ["Égyptienne","Mésopotamienne","Romaine","Grecque"], ans: 0, exp: "Les pyramides de Gizeh ont été construites par l'Égypte antique vers 2560 av. J.-C." },
+      { q: "Qui a découvert l'Amérique en 1492 ?", opts: ["Christophe Colomb","Amerigo Vespucci","Vasco de Gama","Magellan"], ans: 0, exp: "Christophe Colomb a atteint l'Amérique le 12 octobre 1492, croyant être arrivé en Asie." },
+      { q: "Quelle révolution a renversé la monarchie française en 1789 ?", opts: ["La Révolution française","La Révolution industrielle","La Fronde","La Révolution américaine"], ans: 0, exp: "La Révolution française (1789-1799) a renversé Louis XVI et instauré la République." },
+      { q: "Quel général corse est devenu Empereur de France ?", opts: ["Napoléon Bonaparte","Wellington","Joséphine","Murat"], ans: 0, exp: "Napoléon Bonaparte, né en Corse, est devenu Empereur des Français en 1804." },
+    ],
+    moyen: [
+      { q: "Quel traité a mis fin à la Première Guerre Mondiale ?", opts: ["Traité de Versailles","Traité de Paris","Traité de Vienne","Armistice de Rethondes"], ans: 0, exp: "Le Traité de Versailles (28 juin 1919) a officiellement mis fin à la WWI." },
+      { q: "En quelle année a été fondée la République Populaire de Chine ?", opts: ["1949","1945","1912","1960"], ans: 0, exp: "Mao Zedong a proclamé la RPC le 1er octobre 1949 après la victoire des communistes." },
+      { q: "Quel pays a été le premier à accorder le droit de vote aux femmes ?", opts: ["Nouvelle-Zélande","Australie","Finlande","France"], ans: 0, exp: "La Nouvelle-Zélande a accordé le droit de vote aux femmes en 1893, première au monde." },
+      { q: "Que signifie 'Renaissance' dans le contexte historique ?", opts: ["Renouveau culturel","Rebirth politique","Révolution religieuse","Reconquête militaire"], ans: 0, exp: "La Renaissance (14e-17e s.) fut un mouvement de renouveau culturel et artistique en Europe." },
+      { q: "Quel empire était au sommet de sa puissance au XVIe siècle sous Soliman le Magnifique ?", opts: ["Ottoman","Perse","Mongol","Habsburg"], ans: 0, exp: "L'Empire ottoman a atteint son apogée sous Soliman le Magnifique (1520-1566)." },
+      { q: "En quelle année Magellan a-t-il entamé le premier tour du monde ?", opts: ["1519","1492","1498","1510"], ans: 0, exp: "L'expédition de Magellan a débuté en 1519. Magellan mourut en 1521, son équipage finit le tour." },
+      { q: "Quel mouvement politique a pris le pouvoir en Russie en 1917 ?", opts: ["Bolcheviques","Mencheviques","Cadets","Tsaristes"], ans: 0, exp: "Les Bolcheviques de Lénine ont pris le pouvoir lors de la Révolution d'Octobre 1917." },
+      { q: "Quel pharaon est associé à la construction de la grande pyramide de Gizeh ?", opts: ["Kheops","Ramsès II","Toutankhamon","Cléopâtre"], ans: 0, exp: "La grande pyramide de Gizeh a été construite sous le règne du pharaon Kheops vers 2560 av. J.-C." },
+      { q: "Quelle guerre civile américaine s'est déroulée de 1861 à 1865 ?", opts: ["La Guerre de Sécession","La Révolution américaine","La Guerre de 1812","La Guerre mexicaine"], ans: 0, exp: "La Guerre de Sécession (Civil War) a opposé les États du Nord aux États du Sud (Confédérés)." },
+      { q: "Qui a dirigé l'Allemagne nazie pendant la Seconde Guerre Mondiale ?", opts: ["Adolf Hitler","Hermann Göring","Heinrich Himmler","Joseph Goebbels"], ans: 0, exp: "Adolf Hitler, dictateur nazi, a dirigé l'Allemagne de 1933 jusqu'à sa mort en 1945." },
+    ],
+    difficile: [
+      { q: "Quel événement a précipité l'entrée des États-Unis dans la Première Guerre Mondiale ?", opts: ["Le Télégramme Zimmermann","Le naufrage du Lusitania","L'invasion de la Belgique","La Révolution russe"], ans: 0, exp: "Le Télégramme Zimmermann (1917), où l'Allemagne proposait au Mexique une alliance contre les USA, a précipité l'entrée américaine." },
+      { q: "Quel empire contrôlait l'Inde avant les Britanniques, fondé par Babur en 1526 ?", opts: ["Empire moghol","Empire perse","Empire timouride","Sultanat de Delhi"], ans: 0, exp: "L'Empire moghol, fondé par Babur en 1526, domina l'Inde jusqu'au XIXe siècle." },
+      { q: "Quelle philosophie politique est associée à Thomas Hobbes ?", opts: ["Absolutisme","Libéralisme","Anarchisme","Socialisme"], ans: 0, exp: "Hobbes (Léviathan, 1651) défendait l'absolutisme monarchique pour échapper à l'état de nature violent." },
+      { q: "En quel siècle a eu lieu la Guerre des Cent Ans entre France et Angleterre ?", opts: ["XIVe-XVe siècles","XIIe-XIIIe siècles","XVIe-XVIIe siècles","XIIIe-XIVe siècles"], ans: 0, exp: "La Guerre de Cent Ans a duré de 1337 à 1453 (XIVe-XVe siècles), avec Jeanne d'Arc comme figure emblématique." },
+      { q: "Quel accord a établi les frontières européennes après les guerres napoléoniennes ?", opts: ["Congrès de Vienne","Traité de Westphalie","Traité de Versailles","Traité de Paris"], ans: 0, exp: "Le Congrès de Vienne (1814-1815) a redessiné la carte de l'Europe post-napoléonienne." },
+      { q: "Quel est le nom de la loi romaine qui gouvernait les non-citoyens ?", opts: ["Jus Gentium","Jus Civile","Jus Naturale","Lex Romana"], ans: 0, exp: "Le Jus Gentium ('droit des gens') s'appliquait aux peuples non-romains dans l'Empire." },
+      { q: "Quelle bataille de 1242 vit Alexandre Nevski défaire les chevaliers Teutoniques ?", opts: ["Bataille du lac Peïpous","Bataille de la Neva","Bataille de Bouvines","Bataille de Marchfeld"], ans: 0, exp: "La Bataille du lac Peïpous (Lac de Glace, 1242) vit la défaite des Teutoniques contre les Novgorodiens." },
+      { q: "Quelle religion a été fondée par Zoroastre (Zarathoustra) ?", opts: ["Zoroastrisme","Manichéisme","Mithriacisme","Bouddhisme"], ans: 0, exp: "Le Zoroastrisme, fondé par Zoroastre (~1500-1000 av. J.-C.), est l'une des premières religions monothéistes." },
+      { q: "Quel pharaon a tenté d'instaurer le monothéisme en Égypte ancienne ?", opts: ["Akhenaton","Ramsès II","Toutankhamon","Amenhotep II"], ans: 0, exp: "Akhenaton (14e s. av. J.-C.) a imposé le culte d'Aton, tentant un monothéisme révolutionnaire." },
+      { q: "Quelle théorie historique stipule que les conditions matérielles déterminent l'histoire ?", opts: ["Matérialisme historique","Positivisme","Idéalisme hégélien","Structuralisme"], ans: 0, exp: "Le matérialisme historique (Marx & Engels) postule que l'infrastructure économique détermine la superstructure sociale." },
+    ]
+  },
+  geo: {
+    facile: [
+      { q: "Quelle est la capitale de la France ?", opts: ["Paris","Lyon","Marseille","Bordeaux"], ans: 0, exp: "Paris est la capitale et la plus grande ville de France, sur les rives de la Seine." },
+      { q: "Quel est le plus grand océan du monde ?", opts: ["Pacifique","Atlantique","Indien","Arctique"], ans: 0, exp: "L'océan Pacifique couvre environ 165 millions de km², soit plus de la moitié des océans mondiaux." },
+      { q: "Sur quel continent se trouve le Sahara ?", opts: ["Afrique","Asie","Australie","Amérique du Sud"], ans: 0, exp: "Le Sahara est le plus grand désert chaud du monde et couvre une grande partie de l'Afrique du Nord." },
+      { q: "Quelle est la plus haute montagne du monde ?", opts: ["Everest","K2","Kanchenjunga","Lhotse"], ans: 0, exp: "Le mont Everest (8 849 m) est le sommet le plus haut au-dessus du niveau de la mer." },
+      { q: "Quel est le plus long fleuve du monde ?", opts: ["Nil","Amazone","Yang-Tsé","Mississippi"], ans: 0, exp: "Le Nil (6 650 km) est généralement considéré comme le plus long fleuve, bien que l'Amazone soit débattu." },
+      { q: "Quelle est la capitale du Japon ?", opts: ["Tokyo","Osaka","Kyoto","Hiroshima"], ans: 0, exp: "Tokyo est la capitale du Japon et l'une des villes les plus peuplées du monde." },
+      { q: "Combien de continents y a-t-il sur Terre ?", opts: ["7","5","6","8"], ans: 0, exp: "Les 7 continents sont: Afrique, Antarctique, Asie, Australie, Europe, Amérique du Nord, Amérique du Sud." },
+      { q: "Quel pays est le plus grand du monde par superficie ?", opts: ["Russie","Canada","Chine","États-Unis"], ans: 0, exp: "La Russie couvre 17,1 millions de km², soit environ 11% des terres émergées mondiales." },
+      { q: "Quelle mer sépare l'Europe de l'Afrique au niveau du détroit de Gibraltar ?", opts: ["Méditerranée","Rouge","Noire","Caspienne"], ans: 0, exp: "La mer Méditerranée est séparée de l'Atlantique par le détroit de Gibraltar entre Espagne et Maroc." },
+      { q: "Quelle est la capitale du Brésil ?", opts: ["Brasília","São Paulo","Rio de Janeiro","Salvador"], ans: 0, exp: "Brasília est la capitale fédérale du Brésil depuis 1960, construite de toutes pièces dans le plateau central." },
+    ],
+    moyen: [
+      { q: "Quel pays possède le plus grand nombre d'îles au monde ?", opts: ["Suède","Finlande","Norvège","Indonésie"], ans: 0, exp: "La Suède possède environ 221 800 îles, dont la plupart sont non habitées." },
+      { q: "Quel détroit sépare l'Asie de l'Amérique du Nord ?", opts: ["Détroit de Béring","Détroit de Magellan","Détroit d'Hudson","Canal de Panama"], ans: 0, exp: "Le détroit de Béring (88 km) sépare l'Asie (Russie) de l'Amérique du Nord (Alaska)." },
+      { q: "Quel désert est le plus froid du monde ?", opts: ["Antarctique","Arctique","Gobi","Atacama"], ans: 0, exp: "L'Antarctique est le plus grand et le plus froid désert du monde avec des températures descendant à -89°C." },
+      { q: "Quelle ville est connue comme 'la Venise de l'Est' ?", opts: ["Suzhou","Bangkok","Bruges","Amsterdam"], ans: 0, exp: "Suzhou (Chine) est surnommée 'la Venise de l'Orient' pour ses canaux et jardins traditionnels." },
+      { q: "Quel est le pays le plus densément peuplé du monde ?", opts: ["Monaco","Bangladesh","Singapour","Vatican"], ans: 0, exp: "Monaco est l'État le plus densément peuplé avec environ 26 000 habitants/km²." },
+      { q: "Quel fleuve traverse Paris ?", opts: ["Seine","Loire","Rhône","Garonne"], ans: 0, exp: "La Seine traverse Paris sur environ 13 km, passant par Notre-Dame et le Louvre." },
+      { q: "Dans quel pays se trouve le lac Titicaca ?", opts: ["Pérou et Bolivie","Chili","Argentine","Équateur"], ans: 0, exp: "Le lac Titicaca est partagé entre le Pérou et la Bolivie à 3 812 m d'altitude." },
+      { q: "Quelle est la capitale de l'Australie ?", opts: ["Canberra","Sydney","Melbourne","Brisbane"], ans: 0, exp: "Canberra est la capitale fédérale de l'Australie depuis 1927, choisie comme compromis entre Sydney et Melbourne." },
+      { q: "Quel pays est surnommé 'le pays du soleil levant' ?", opts: ["Japon","Corée du Sud","Chine","Thaïlande"], ans: 0, exp: "Le Japon est surnommé 'pays du soleil levant' (Nihon) car il se trouve à l'est de la Chine." },
+      { q: "Quelle chaîne de montagnes sépare l'Europe de l'Asie ?", opts: ["Oural","Alpes","Caucase","Himalaya"], ans: 0, exp: "Les monts Oural (2 500 km) constituent la frontière naturelle traditionnelle entre Europe et Asie." },
+    ],
+    difficile: [
+      { q: "Quel pays possède le plus de frontières terrestres ?", opts: ["Chine","Russie","Brésil","Allemagne"], ans: 0, exp: "La Chine et la Russie sont à égalité avec 14 pays voisins chacun." },
+      { q: "Quelle est la ville la plus au nord du monde avec une population significative ?", opts: ["Longyearbyen","Tromsø","Murmansk","Barrow"], ans: 0, exp: "Longyearbyen (Svalbard, Norvège) est l'agglomération la plus septentrionale avec environ 2 500 habitants." },
+      { q: "Quel fleuve a le plus grand débit d'eau ?", opts: ["Amazone","Nil","Congo","Mississippi"], ans: 0, exp: "L'Amazone a le débit le plus important au monde (~209 000 m³/s), représentant 20% des eaux douces mondiales." },
+      { q: "Qu'est-ce que la ligne de changement de date internationale ?", opts: ["Méridien 180°","Méridien de Greenwich","Tropique du Capricorne","Cercle polaire"], ans: 0, exp: "La ligne de changement de date suit approximativement le méridien 180° dans l'océan Pacifique." },
+      { q: "Quel pays a la forme géographique la plus proche d'un hexagone ?", opts: ["France","Belgique","Pologne","Hongrie"], ans: 0, exp: "La France est souvent appelée 'l'Hexagone' en raison de sa forme géographique à 6 côtés." },
+      { q: "Quel est le point le plus profond des océans ?", opts: ["Fosse des Mariannes","Fosse de Tonga","Fosse de Kermadec","Fosse de Puerto Rico"], ans: 0, exp: "La fosse des Mariannes dans le Pacifique atteint 11 034 m de profondeur au Challenger Deep." },
+      { q: "Quel pays est entièrement enclavé dans un autre pays ?", opts: ["Lesotho","Vatican","Saint-Marin","Monaco"], ans: 0, exp: "Le Lesotho est entièrement entouré par l'Afrique du Sud. Le Vatican et Saint-Marin sont en Italie." },
+      { q: "Quelle est la mer la plus salée du monde ?", opts: ["Mer Morte","Mer d'Aral","Mer Rouge","Mer Caspienne"], ans: 0, exp: "La mer Morte a une salinité d'environ 34%, soit 10 fois plus que l'océan moyen." },
+      { q: "Quel pays d'Afrique subsaharienne a la plus grande économie ?", opts: ["Nigeria","Afrique du Sud","Kenya","Éthiopie"], ans: 0, exp: "Le Nigeria est la plus grande économie d'Afrique subsaharienne avec un PIB d'environ 450 milliards de dollars." },
+      { q: "Combien d'États américains sont adjacents à l'océan Pacifique ?", opts: ["5","3","4","6"], ans: 0, exp: "5 États : Californie, Oregon, Washington, Alaska et Hawaii ont un accès direct au Pacifique." },
+    ]
+  },
+  tech: {
+    facile: [
+      { q: "Que signifie l'acronyme 'CPU' ?", opts: ["Central Processing Unit","Computer Power Unit","Control Processing Unit","Central Program Unit"], ans: 0, exp: "CPU signifie 'Central Processing Unit' (Unité centrale de traitement), le cerveau de l'ordinateur." },
+      { q: "Quel langage de programmation est principalement utilisé pour le web frontend ?", opts: ["JavaScript","Python","Java","C++"], ans: 0, exp: "JavaScript est le langage principal du web côté client, supporté nativement par tous les navigateurs." },
+      { q: "Que signifie 'HTML' ?", opts: ["HyperText Markup Language","High Tech Modern Language","HyperText Modern Layout","High Transfer Markup Language"], ans: 0, exp: "HTML (HyperText Markup Language) est le langage standard pour créer des pages web." },
+      { q: "Qu'est-ce qu'un algorithme ?", opts: ["Suite d'instructions","Type d'ordinateur","Langage de programmation","Système d'exploitation"], ans: 0, exp: "Un algorithme est une suite finie d'instructions permettant de résoudre un problème ou d'accomplir une tâche." },
+      { q: "Quelle entreprise a créé le système d'exploitation Android ?", opts: ["Google","Apple","Microsoft","Samsung"], ans: 0, exp: "Android a été développé par Android Inc., rachetée par Google en 2005." },
+      { q: "Que signifie 'RAM' ?", opts: ["Random Access Memory","Read Access Memory","Rapid Application Module","Runtime Access Mode"], ans: 0, exp: "RAM (Random Access Memory) est la mémoire vive, utilisée pour stocker temporairement les données en cours d'utilisation." },
+      { q: "Quel protocole sécurise les communications web avec HTTPS ?", opts: ["TLS/SSL","HTTP","FTP","TCP"], ans: 0, exp: "HTTPS utilise TLS (Transport Layer Security) pour chiffrer les communications entre navigateur et serveur." },
+      { q: "Qu'est-ce que l'Internet des Objets (IoT) ?", opts: ["Appareils connectés à Internet","Réseau privé","Type de virus","Cloud computing"], ans: 0, exp: "L'IoT désigne tous les objets physiques connectés à Internet (montres, réfrigérateurs, thermostats...)." },
+      { q: "Quelle est la fonction principale d'un pare-feu (firewall) ?", opts: ["Filtrer le trafic réseau","Accélérer Internet","Stocker des données","Gérer les emails"], ans: 0, exp: "Un firewall analyse et filtre le trafic réseau entrant et sortant pour protéger le système." },
+      { q: "Que signifie 'URL' ?", opts: ["Uniform Resource Locator","Universal Remote Link","Unified Request Language","User Reference Library"], ans: 0, exp: "URL (Uniform Resource Locator) est l'adresse web d'une ressource sur Internet." },
+    ],
+    moyen: [
+      { q: "Qu'est-ce que la complexité algorithmique O(n) signifie ?", opts: ["Temps linéaire","Temps constant","Temps quadratique","Temps logarithmique"], ans: 0, exp: "O(n) indique que le temps d'exécution croît linéairement avec la taille des données." },
+      { q: "Quel paradigme de programmation Python supporte principalement ?", opts: ["Multi-paradigme","Purement orienté objet","Purement fonctionnel","Procédural uniquement"], ans: 0, exp: "Python est multi-paradigme : il supporte OOP, la programmation fonctionnelle et procédurale." },
+      { q: "Que fait la commande 'git commit' ?", opts: ["Sauvegarde les changements localement","Envoie au serveur distant","Crée une branche","Fusionne les branches"], ans: 0, exp: "git commit enregistre un instantané des modifications dans le dépôt local avec un message." },
+      { q: "Qu'est-ce qu'une API REST ?", opts: ["Interface de communication HTTP","Base de données","Langage de programmation","Système d'exploitation"], ans: 0, exp: "REST (Representational State Transfer) est un style architectural utilisant HTTP pour les APIs web." },
+      { q: "Que signifie 'SQL' ?", opts: ["Structured Query Language","System Query Logic","Sequential Query List","Server Query Layer"], ans: 0, exp: "SQL (Structured Query Language) est le langage standard pour gérer et interroger les bases de données relationnelles." },
+      { q: "Qu'est-ce que la récursivité en programmation ?", opts: ["Fonction qui s'appelle elle-même","Boucle infinie","Type de variable","Héritage de classe"], ans: 0, exp: "La récursivité est une technique où une fonction se rappelle elle-même avec une condition d'arrêt (cas de base)." },
+      { q: "Quel type de base de données est MongoDB ?", opts: ["NoSQL","SQL","Relationnelle","Graphe"], ans: 0, exp: "MongoDB est une base de données NoSQL orientée documents, stockant les données en format BSON (JSON binaire)." },
+      { q: "Que représente l'adresse IP 127.0.0.1 ?", opts: ["Localhost","Google DNS","Serveur local","Broadcast"], ans: 0, exp: "127.0.0.1 est l'adresse de loopback (localhost), pointant vers la machine locale." },
+      { q: "Qu'est-ce que le machine learning supervisé ?", opts: ["Apprentissage avec données étiquetées","Apprentissage sans labels","Apprentissage par renforcement","Deep learning"], ans: 0, exp: "L'apprentissage supervisé utilise des données d'entraînement étiquetées pour apprendre à prédire des résultats." },
+      { q: "Qu'est-ce qu'un conteneur Docker ?", opts: ["Environnement d'exécution isolé","Type de serveur","Framework web","Base de données"], ans: 0, exp: "Un conteneur Docker encapsule une application et ses dépendances dans un environnement isolé et portable." },
+    ],
+    difficile: [
+      { q: "Quel algorithme de tri a une complexité moyenne de O(n log n) ?", opts: ["Quicksort","Bubble sort","Insertion sort","Selection sort"], ans: 0, exp: "Quicksort a une complexité moyenne O(n log n) mais peut atteindre O(n²) dans le pire cas." },
+      { q: "Qu'est-ce que le théorème CAP en systèmes distribués ?", opts: ["Consistency, Availability, Partition","Cache, API, Performance","Concurrency, Atomicity, Persistence","Control, Access, Protocol"], ans: 0, exp: "Le théorème CAP stipule qu'un système distribué ne peut garantir simultanément que 2 des 3 propriétés." },
+      { q: "Qu'est-ce que le polymorphisme en POO ?", opts: ["Un objet peut prendre plusieurs formes","Héritage multiple","Encapsulation des données","Abstraction d'interface"], ans: 0, exp: "Le polymorphisme permet à des objets de différentes classes d'être traités via une interface commune." },
+      { q: "Que signifie SOLID en ingénierie logicielle ?", opts: ["5 principes de conception OOP","Framework JavaScript","Architecture microservices","Méthode agile"], ans: 0, exp: "SOLID = Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion." },
+      { q: "Qu'est-ce qu'une race condition en programmation concurrente ?", opts: ["Bug dépendant de l'ordre d'exécution","Erreur de compilation","Débordement de mémoire","Deadlock"], ans: 0, exp: "Une race condition survient quand le résultat dépend de l'ordre imprévisible d'exécution de threads concurrents." },
+      { q: "Quel problème résout le pattern Observer (observateur) ?", opts: ["Notification de changements d'état","Gestion de la mémoire","Optimisation des requêtes","Sécurité des données"], ans: 0, exp: "L'Observer pattern définit une dépendance 1-N : quand un objet change d'état, ses dépendants sont notifiés automatiquement." },
+      { q: "Qu'est-ce que le garbage collection (GC) ?", opts: ["Libération automatique de mémoire","Nettoyage des logs","Suppression de fichiers","Optimisation CPU"], ans: 0, exp: "Le GC est un mécanisme automatique qui identifie et libère la mémoire non utilisée par le programme." },
+      { q: "Qu'est-ce qu'un deadlock en systèmes d'exploitation ?", opts: ["Blocage mutuel de processus","Crash système","Débordement de pile","Fuite mémoire"], ans: 0, exp: "Un deadlock est une situation où 2+ processus attendent indéfiniment une ressource détenue par l'autre." },
+      { q: "Quelle structure de données offre une recherche en O(1) en moyenne ?", opts: ["Table de hachage","Tableau","Liste chaînée","Arbre binaire"], ans: 0, exp: "Une hash table (table de hachage) offre des opérations de recherche, insertion, suppression en O(1) en moyenne." },
+      { q: "Qu'est-ce que le protocole TCP/IP ?", opts: ["Suite de protocoles réseau","Langage web","Système de fichiers","Protocole de sécurité"], ans: 0, exp: "TCP/IP est la suite de protocoles fondamentale d'Internet, garantissant la transmission fiable des données." },
+    ]
+  },
+  culture: {
+    facile: [
+      { q: "Qui a écrit 'Les Misérables' ?", opts: ["Victor Hugo","Gustave Flaubert","Honoré de Balzac","Émile Zola"], ans: 0, exp: "Les Misérables (1862) est le chef-d'œuvre de Victor Hugo, auteur romantique français." },
+      { q: "Quel artiste a peint 'La Nuit étoilée' ?", opts: ["Van Gogh","Picasso","Monet","Rembrandt"], ans: 0, exp: "La Nuit étoilée (1889) a été peinte par Vincent van Gogh à Saint-Rémy-de-Provence." },
+      { q: "Qui a composé la 5ème Symphonie en ut mineur ?", opts: ["Beethoven","Mozart","Bach","Chopin"], ans: 0, exp: "La 5ème Symphonie de Beethoven (1808) est mondialement connue pour son célèbre motif de 4 notes." },
+      { q: "Quel personnage Sherlock Holmes a-t-il comme ami fidèle ?", opts: ["Dr Watson","Inspector Lestrade","Mycroft Holmes","Mrs Hudson"], ans: 0, exp: "Dr John H. Watson est le fidèle compagnon de Sherlock Holmes, créé par Arthur Conan Doyle." },
+      { q: "Dans quelle ville se déroule 'Roméo et Juliette' de Shakespeare ?", opts: ["Vérone","Florence","Rome","Venise"], ans: 0, exp: "Roméo et Juliette se déroule à Vérone, en Italie, où Shakespeare a situé la tragédie de cet amour impossible." },
+      { q: "Quel mouvement artistique Monet représente-t-il ?", opts: ["Impressionnisme","Cubisme","Surréalisme","Réalisme"], ans: 0, exp: "Claude Monet est le chef de file de l'Impressionnisme, mouvement né en France dans les années 1870." },
+      { q: "Qui a écrit 'Le Petit Prince' ?", opts: ["Antoine de Saint-Exupéry","Jules Verne","Albert Camus","Marcel Proust"], ans: 0, exp: "Le Petit Prince (1943) est l'œuvre la plus célèbre d'Antoine de Saint-Exupéry, aviateur et écrivain." },
+      { q: "Quel opéra contient l'aria 'Nessun Dorma' ?", opts: ["Turandot","Aida","La Traviata","Rigoletto"], ans: 0, exp: "Nessun Dorma (Que nul ne dorme) est le célèbre air de Calaf dans Turandot de Puccini." },
+      { q: "Quel est le roman de Franz Kafka sur un homme transformé en insecte ?", opts: ["La Métamorphose","Le Procès","Le Château","Amerika"], ans: 0, exp: "La Métamorphose (1915) de Kafka raconte Gregor Samsa qui se réveille un matin transformé en insecte." },
+      { q: "Quel poète romantique anglais a écrit 'Ode à un rossignol' ?", opts: ["John Keats","Percy Shelley","Lord Byron","William Blake"], ans: 0, exp: "Ode à un rossignol (1819) est l'un des grands poèmes du romantique anglais John Keats." },
+    ],
+    moyen: [
+      { q: "Quel mouvement a été fondé par André Breton dans les années 1920 ?", opts: ["Surréalisme","Dadaïsme","Futurisme","Expressionnisme"], ans: 0, exp: "André Breton a fondé le Surréalisme et publié son Manifeste en 1924, prônant l'automatisme psychique." },
+      { q: "Quel compositeur était sourd quand il a composé sa 9ème Symphonie ?", opts: ["Beethoven","Bach","Mozart","Haydn"], ans: 0, exp: "Beethoven était pratiquement sourd lorsqu'il a composé la 9ème Symphonie (1824), avec l'Ode à la Joie." },
+      { q: "Quel auteur a créé le personnage Don Quichotte ?", opts: ["Miguel de Cervantes","Lope de Vega","Francisco de Quevedo","Calderón"], ans: 0, exp: "Miguel de Cervantes a écrit Don Quichotte (1605-1615), considéré comme le premier roman moderne." },
+      { q: "Dans quelle ville est né le jazz ?", opts: ["La Nouvelle-Orléans","New York","Chicago","Memphis"], ans: 0, exp: "Le jazz est né à La Nouvelle-Orléans vers 1900, fruit de la fusion de musiques africaines et européennes." },
+      { q: "Quel peintre espagnol est connu pour son style cubiste ?", opts: ["Pablo Picasso","Salvador Dalí","Joan Miró","Francisco Goya"], ans: 0, exp: "Pablo Picasso est le co-fondateur du Cubisme avec Georges Braque, révolutionnant l'art du 20e siècle." },
+      { q: "Qui a écrit 'L'Étranger' ?", opts: ["Albert Camus","Jean-Paul Sartre","Simone de Beauvoir","André Gide"], ans: 0, exp: "L'Étranger (1942) est l'œuvre phare d'Albert Camus, illustrant la philosophie de l'absurde." },
+      { q: "Quel genre musical a émergé de la Jamaïque dans les années 1960 ?", opts: ["Reggae","Ska","Rocksteady","Dancehall"], ans: 0, exp: "Le reggae, popularisé par Bob Marley, est né en Jamaïque à la fin des années 1960." },
+      { q: "Qui est l'auteur de '1984' ?", opts: ["George Orwell","Aldous Huxley","Ray Bradbury","H.G. Wells"], ans: 0, exp: "1984 (1949) est le roman dystopique de George Orwell décrivant un régime totalitaire sous Big Brother." },
+      { q: "Quelle technique utilisait Rembrandt pour les contrastes lumière/ombre ?", opts: ["Clair-obscur","Sfumato","Pointillisme","Impasto"], ans: 0, exp: "Rembrandt maîtrisait le clair-obscur (chiaroscuro), contraste dramatique entre lumière et ombre." },
+      { q: "Qui a composé 'Le Lac des Cygnes' ?", opts: ["Tchaïkovski","Stravinsky","Prokofiev","Rachmaninov"], ans: 0, exp: "Le Lac des Cygnes (1875-1876) est un ballet de Piotr Ilitch Tchaïkovski, chef-d'œuvre du répertoire classique." },
+    ],
+    difficile: [
+      { q: "Quel style architectural a été développé par Antoni Gaudí ?", opts: ["Art nouveau catalan","Gothique tardif","Modernisme baroque","Neo-byzantin"], ans: 0, exp: "Gaudí a développé un style unique, synthèse de l'Art nouveau, de l'architecture gothique et des formes organiques." },
+      { q: "Quel roman de Proust décrit la mémoire involontaire ?", opts: ["À la recherche du temps perdu","Jean Santeuil","Les Plaisirs et les jours","Contre Sainte-Beuve"], ans: 0, exp: "À la recherche du temps perdu (7 volumes, 1913-1927) explore la mémoire et le temps à travers la madeleine trempée." },
+      { q: "Quelle école artistique allemande a révolutionné le design au XXe siècle ?", opts: ["Bauhaus","Wiener Werkstätte","De Stijl","Arts and Crafts"], ans: 0, exp: "Le Bauhaus (1919-1933), fondé par Walter Gropius, a révolutionné l'art, le design et l'architecture." },
+      { q: "Qui a peint 'Le Cri' (Skrik) ?", opts: ["Edvard Munch","Egon Schiele","Gustav Klimt","Oskar Kokoschka"], ans: 0, exp: "Le Cri (1893) est l'œuvre emblématique du norvégien Edvard Munch, précurseur de l'expressionnisme." },
+      { q: "Quel est le terme musical pour une composition à plusieurs voix indépendantes ?", opts: ["Polyphonie","Homophonie","Monophonie","Hétérophonie"], ans: 0, exp: "La polyphonie désigne une texture musicale où plusieurs voix ou instruments jouent des lignes mélodiques indépendantes." },
+      { q: "Quel écrivain argentin a créé le concept de 'réalisme magique' en littérature ?", opts: ["Jorge Luis Borges","Gabriel García Márquez","Isabel Allende","Julio Cortázar"], ans: 0, exp: "Borges a influencé le réalisme magique, mais García Márquez (Cent ans de solitude) en est le représentant majeur." },
+      { q: "Quel est le principe de la 'défamiliarisation' (ostranienie) dans la théorie littéraire ?", opts: ["Rendre l'ordinaire étrange","Narration à la première personne","Structure en cadre","Flux de conscience"], ans: 0, exp: "L'ostranienie (Viktor Chklovski, 1917) est la technique de présenter les choses de manière inhabituelles pour renouveler la perception." },
+      { q: "Qui a théorisé le concept d'hégémonie culturelle ?", opts: ["Antonio Gramsci","Louis Althusser","Michel Foucault","Pierre Bourdieu"], ans: 0, exp: "Antonio Gramsci a développé le concept d'hégémonie culturelle ?", opts: ["Antonio Gramsci","Louis Althusser","Michel Foucault","Pierre Bourdieu"], ans: 0, exp: "Antonio Gramsci a développé le concept d'hégémonie culturelle dans ses Cahiers de prison (1929-1935)." },
+      { q: "Quel est le terme désignant l'art de la calligraphie en Extrême-Orient ?", opts: ["Shodō","Ikebana","Sumi-e","Ukiyo-e"], ans: 0, exp: "Le shodō (書道) est l'art de la calligraphie japonaise, issu de la calligraphie chinaise (shūfǎ)." },
+      { q: "Quel compositeur a écrit 'Le Sacre du Printemps' (1913) ?", opts: ["Igor Stravinsky","Claude Debussy","Sergei Prokofiev","Béla Bartók"], ans: 0, exp: "Le Sacre du Printemps (1913) d'Igor Stravinsky a provoqué un scandale retentissant à sa création à Paris." },
+    ]
+  },
+  sport: {
+    facile: [
+      { q: "Combien de joueurs compte une équipe de football (soccer) ?", opts: ["11","10","12","9"], ans: 0, exp: "Une équipe de football compte 11 joueurs sur le terrain, dont un gardien de but." },
+      { q: "Quel pays a remporté le plus de Coupes du Monde de football ?", opts: ["Brésil","Allemagne","Italie","Argentine"], ans: 0, exp: "Le Brésil a remporté 5 Coupes du Monde (1958, 1962, 1970, 1994, 2002), un record." },
+      { q: "Combien de sets faut-il gagner pour remporter un match de tennis en Grand Chelem (hommes) ?", opts: ["3","2","4","5"], ans: 0, exp: "En Grand Chelem masculin, il faut gagner 3 sets sur 5 pour remporter le match." },
+      { q: "Quel sport se joue avec un volant (shuttlecock) ?", opts: ["Badminton","Tennis","Squash","Padel"], ans: 0, exp: "Le badminton utilise un volant (ou volant de plumes) frappé au-dessus d'un filet." },
+      { q: "Aux JO, quelle couleur a l'anneau représentant l'Afrique ?", opts: ["Vert","Jaune","Rouge","Bleu"], ans: 0, exp: "Le vert représente l'Afrique dans les 5 anneaux olympiques (bleu, jaune, noir, vert, rouge)." },
+      { q: "Combien de points vaut un essai au rugby à XV ?", opts: ["5","4","3","6"], ans: 0, exp: "Un essai vaut 5 points au rugby à XV, avec la possibilité d'une transformation à 2 points." },
+      { q: "Quel sport pratique Roger Federer ?", opts: ["Tennis","Squash","Badminton","Padel"], ans: 0, exp: "Roger Federer est l'un des plus grands joueurs de tennis de l'histoire avec 20 titres du Grand Chelem." },
+      { q: "Quelle est la distance d'un marathon ?", opts: ["42,195 km","40 km","45 km","38 km"], ans: 0, exp: "Le marathon mesure exactement 42,195 km, distance fixée lors des JO de Londres en 1908." },
+      { q: "Dans quel sport utilise-t-on un 'birdie' et un 'eagle' ?", opts: ["Golf","Tennis","Baseball","Badminton"], ans: 0, exp: "Au golf, un birdie = -1 coup par rapport au par, un eagle = -2 coups par rapport au par." },
+      { q: "Combien de joueurs par équipe au basketball ?", opts: ["5","6","4","7"], ans: 0, exp: "Une équipe de basketball aligne 5 joueurs sur le terrain simultanément." },
+    ],
+    moyen: [
+      { q: "Quel nageur détient le record du plus grand nombre de médailles olympiques ?", opts: ["Michael Phelps","Mark Spitz","Ian Thorpe","Ryan Lochte"], ans: 0, exp: "Michael Phelps détient 28 médailles olympiques (23 or, 3 argent, 2 bronze), un record absolu." },
+      { q: "Quelle ville a accueilli les premiers Jeux Olympiques modernes en 1896 ?", opts: ["Athènes","Paris","Londres","Stockholm"], ans: 0, exp: "Les premiers JO modernes ont eu lieu à Athènes en 1896, organisés par Pierre de Coubertin." },
+      { q: "Quelle équipe de NBA est surnommée 'les Bulls' ?", opts: ["Chicago","Boston","Los Angeles","New York"], ans: 0, exp: "Les Chicago Bulls sont l'équipe NBA d'Illinois, célèbre pour les 6 titres remportés avec Michael Jordan." },
+      { q: "En cricket, qu'est-ce qu'un 'googly' ?", opts: ["Lancer trompeur","Type de batte","Score parfait","Faute de frappe"], ans: 0, exp: "Un googly est une balle de cricket lancée par un leg-spin bowler qui tourne de manière inattendue." },
+      { q: "Combien de couloirs (lanes) y a-t-il dans un stade d'athlétisme standard ?", opts: ["8","6","10","9"], ans: 0, exp: "Une piste d'athlétisme standard comporte 8 couloirs de 1,22 mètre de large chacun." },
+      { q: "Quel pays a inventé le sport du sumo ?", opts: ["Japon","Chine","Corée","Mongolie"], ans: 0, exp: "Le sumo est un sport de lutte japonais avec plus de 1 500 ans d'histoire, lié au Shinto." },
+      { q: "Quel est le terme pour un score de zéro au tennis ?", opts: ["Love","Zero","Nil","Nought"], ans: 0, exp: "Au tennis, 'love' désigne zéro point, probablement dérivé du mot français 'l'œuf' (la forme ronde de 0)." },
+      { q: "Quelle est la hauteur officielle du filet au volleyball ?", opts: ["2,43m (hommes) / 2,24m (femmes)","2,40m / 2,20m","2,50m / 2,30m","2,35m / 2,15m"], ans: 0, exp: "Le filet de volleyball mesure 2,43m pour les hommes et 2,24m pour les femmes." },
+      { q: "En quelle année les femmes ont-elles pu participer aux JO pour la première fois ?", opts: ["1900","1920","1908","1924"], ans: 0, exp: "Les premières femmes ont participé aux JO de Paris en 1900, dans le tennis et le golf." },
+      { q: "Quel sprinter jamaïcain détient le record du monde du 100m ?", opts: ["Usain Bolt","Asafa Powell","Yohan Blake","Shelly-Ann Fraser"], ans: 0, exp: "Usain Bolt détient le record du monde du 100m avec 9,58 secondes aux Mondiaux de Berlin en 2009." },
+    ],
+    difficile: [
+      { q: "Quel est le coefficient de difficulté maximal en gymnastique artistique ?", opts: ["Il est illimité depuis 2006","6,0","10,0","8,0"], ans: 0, exp: "Depuis 2006, la FIG a supprimé le score parfait de 10.0. Le D-score (difficulté) est théoriquement illimité." },
+      { q: "En quel sport pratique-t-on le 'epée', le 'fleuret' et le 'sabre' ?", opts: ["Escrime","Kendo","Iaïdo","Wushu"], ans: 0, exp: "L'escrime olympique comprend trois armes : le fleuret, l'épée et le sabre, avec des règles distinctes." },
+      { q: "Quel pays a remporté le plus de médailles d'or aux JO de l'été de tous les temps ?", opts: ["États-Unis","Russie/URSS","Chine","Grande-Bretagne"], ans: 0, exp: "Les États-Unis dominent le bilan total des médailles d'or olympiques avec plus de 1 000 médailles d'or." },
+      { q: "Qu'est-ce que le 'Fosbury Flop' en athlétisme ?", opts: ["Technique de saut en hauteur","Style de lancement de disque","Technique de sprint","Départ en natation"], ans: 0, exp: "Dick Fosbury a révolutionné le saut en hauteur aux JO 1968 avec son saut dos tourné à la barre." },
+      { q: "Quelle équipe de football a remporté le plus de Ligues des Champions ?", opts: ["Real Madrid","AC Milan","Bayern Munich","Liverpool"], ans: 0, exp: "Le Real Madrid a remporté 14 fois la Ligue des Champions / Coupe d'Europe (record absolu)." },
+      { q: "En boxe anglaise, combien de rounds comprend un combat de championnat du monde ?", opts: ["12","15","10","8"], ans: 0, exp: "Depuis 1988, les championnats du monde de boxe se disputent sur 12 rounds de 3 minutes." },
+      { q: "Quel est l'équipement distinctif du polo ?", opts: ["Maillet à long manche","Bâton coudé","Crosse incurvée","Raquette spéciale"], ans: 0, exp: "Le polo se joue à cheval avec un maillet (mallet) à long manche flexible pour frapper la balle." },
+      { q: "En curling, quel instrument mesure la distance des pierres ?", opts: ["Le 'measuring device'","Le 'skip'","Le 'hammer'","Le 'broom'"], ans: 0, exp: "Un 'measuring device' (outil de mesure) est utilisé pour déterminer quelle équipe a la pierre la plus proche du centre (bouton)." },
+      { q: "Quel est le record du monde du saut en longueur, établi depuis 1991 ?", opts: ["8,95m par Mike Powell","8,90m par Bob Beamon","9,01m par Carl Lewis","8,87m par Ivan Pedroso"], ans: 0, exp: "Mike Powell a établi le record mondial du saut en longueur avec 8,95m aux Mondiaux de Tokyo en 1991." },
+      { q: "En voile, que désigne le terme 'mayday' ?", opts: ["Signal international de détresse","Type de manœuvre","Direction du vent","Nom d'un nœud"], ans: 0, exp: "Mayday (du français 'm'aidez') est le signal international de détresse radio, utilisé en mer et en aviation." },
+    ]
+  }
+};
+
+// State
+let state = {
+  category: null,
+  difficulty: 'moyen',
+  questions: [],
+  current: 0,
+  score: 0,
+  answered: [],
+  startTime: null,
+  questionStartTime: null,
+  timerInterval: null,
+  timeLeft: 20,
+  maxTime: 20,
+  streak: 0,
+  maxStreak: 0,
+  skipped: 0,
+  timeData: [],
+};
+
+// DOM refs
+const homeScreen = document.getElementById('homeScreen');
+const quizScreen = document.getElementById('quizScreen');
+const resultsScreen = document.getElementById('resultsScreen');
+
+// Init
+document.querySelectorAll('.cat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.category = btn.dataset.cat;
+    document.getElementById('startBtn').disabled = false;
+  });
+});
+
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.difficulty = btn.dataset.diff;
+  });
+});
+
+document.getElementById('startBtn').addEventListener('click', startQuiz);
+document.getElementById('nextBtn').addEventListener('click', nextQuestion);
+document.getElementById('skipBtn').addEventListener('click', skipQuestion);
+document.getElementById('retryBtn').addEventListener('click', retryQuiz);
+document.getElementById('homeBtn').addEventListener('click', goHome);
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startQuiz() {
+  const pool = QUESTIONS[state.category][state.difficulty];
+  state.questions = shuffle(pool).slice(0, 10);
+  state.current = 0;
+  state.score = 0;
+  state.answered = [];
+  state.streak = 0;
+  state.maxStreak = 0;
+  state.skipped = 0;
+  state.timeData = [];
+  state.startTime = Date.now();
+
+  showScreen('quizScreen');
+  buildProgressDots();
+  showQuestion();
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function buildProgressDots() {
+  const container = document.getElementById('progressDots');
+  container.innerHTML = '';
+  state.questions.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'pdot' + (i === 0 ? ' current' : '');
+    dot.id = 'dot-' + i;
+    container.appendChild(dot);
+  });
+}
+
+function showQuestion() {
+  const q = state.questions[state.current];
+  const total = state.questions.length;
+  const num = state.current + 1;
+
+  document.getElementById('quizCatTag').textContent = state.category.charAt(0).toUpperCase() + state.category.slice(1);
+  document.getElementById('qCounter').textContent = `Q ${num} / ${total}`;
+  document.getElementById('liveScore').textContent = state.score;
+  document.getElementById('questionNum').textContent = `Question ${num}`;
+  document.getElementById('questionText').textContent = q.q;
+
+  const grid = document.getElementById('optionsGrid');
+  grid.innerHTML = '';
+  const letters = ['A', 'B', 'C', 'D'];
+  q.opts.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.innerHTML = `<span class="opt-letter">${letters[i]}</span><span>${opt}</span>`;
+    btn.addEventListener('click', () => selectAnswer(i));
+    grid.appendChild(btn);
+  });
+
+  document.getElementById('feedbackPanel').classList.remove('show');
+  document.getElementById('nextBtn').disabled = true;
+  document.getElementById('skipBtn').disabled = false;
+
+  // Update dots
+  document.querySelectorAll('.pdot').forEach((d, i) => {
+    d.classList.remove('current');
+    if (i === state.current) d.classList.add('current');
+  });
+
+  startTimer();
+  state.questionStartTime = Date.now();
+}
+
+function startTimer() {
+  clearInterval(state.timerInterval);
+  state.timeLeft = state.maxTime;
+  updateTimerUI();
+  state.timerInterval = setInterval(() => {
+    state.timeLeft--;
+    updateTimerUI();
+    if (state.timeLeft <= 0) {
+      clearInterval(state.timerInterval);
+      autoTimeout();
+    }
+  }, 1000);
+}
+
+function updateTimerUI() {
+  const pct = (state.timeLeft / state.maxTime) * 100;
+  const bar = document.getElementById('timerBar');
+  bar.style.width = pct + '%';
+  bar.className = 'timer-bar' + (state.timeLeft <= 5 ? ' warning' : '');
+  document.getElementById('timerText').textContent = state.timeLeft + 's';
+}
+
+function autoTimeout() {
+  const q = state.questions[state.current];
+  document.querySelectorAll('.option-btn').forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === q.ans) btn.classList.add('correct');
+  });
+  recordAnswer(-1, false);
+  showFeedback(false, q, -1);
+  document.getElementById('nextBtn').disabled = false;
+  document.getElementById('skipBtn').disabled = true;
+}
+
+function selectAnswer(idx) {
+  clearInterval(state.timerInterval);
+  const q = state.questions[state.current];
+  const correct = idx === q.ans;
+  const elapsed = (Date.now() - state.questionStartTime) / 1000;
+  state.timeData.push(elapsed);
+
+  document.querySelectorAll('.option-btn').forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === q.ans) btn.classList.add('correct');
+    if (i === idx && !correct) btn.classList.add('wrong');
+    if (i === idx && correct) btn.classList.add('selected-correct');
+    if (i === idx && !correct) btn.classList.add('selected-wrong');
+  });
+
+  if (correct) {
+    state.score += calculatePoints();
+    state.streak++;
+    if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+  } else {
+    state.streak = 0;
+  }
+
+  document.getElementById('liveScore').textContent = state.score;
+  recordAnswer(idx, correct);
+  showFeedback(correct, q, idx);
+  document.getElementById('nextBtn').disabled = false;
+  document.getElementById('skipBtn').disabled = true;
+
+  const dot = document.getElementById('dot-' + state.current);
+  dot.classList.remove('current');
+  dot.classList.add(correct ? 'correct' : 'wrong');
+}
+
+function calculatePoints() {
+  // Time bonus
+  const timeBonus = Math.max(0, Math.floor((state.timeLeft / state.maxTime) * 50));
+  const diffBonus = state.difficulty === 'facile' ? 100 : state.difficulty === 'moyen' ? 150 : 200;
+  return diffBonus + timeBonus;
+}
+
+function recordAnswer(idx, correct) {
+  state.answered.push({ q: state.questions[state.current], selected: idx, correct });
+}
+
+function showFeedback(correct, q, idx) {
+  const panel = document.getElementById('feedbackPanel');
+  panel.classList.add('show');
+  document.getElementById('feedbackIcon').textContent = correct ? '✅' : idx === -1 ? '⏱️' : '❌';
+  const title = document.getElementById('feedbackTitle');
+  title.textContent = correct ? 'Correct !' : idx === -1 ? 'Temps écoulé !' : 'Incorrect !';
+  title.className = 'feedback-title ' + (correct ? 'correct-text' : 'wrong-text');
+  document.getElementById('feedbackExplain').textContent = q.exp;
+}
+
+function skipQuestion() {
+  clearInterval(state.timerInterval);
+  state.skipped++;
+  state.streak = 0;
+  const q = state.questions[state.current];
+  document.querySelectorAll('.option-btn').forEach((btn, i) => {
+    btn.disabled = true;
+    if (i === q.ans) btn.classList.add('correct');
+  });
+  recordAnswer(-2, false);
+  const dot = document.getElementById('dot-' + state.current);
+  dot.classList.remove('current');
+  dot.classList.add('wrong');
+  showFeedback(false, q, -1);
+  document.getElementById('nextBtn').disabled = false;
+  document.getElementById('skipBtn').disabled = true;
+}
+
+function nextQuestion() {
+  state.current++;
+  if (state.current >= state.questions.length) {
+    showResults();
+  } else {
+    showQuestion();
+  }
+}
+
+function showResults() {
+  clearInterval(state.timerInterval);
+  const correct = state.answered.filter(a => a.correct).length;
+  const total = state.questions.length;
+  const pct = Math.round((correct / total) * 100);
+  const avgTime = state.timeData.length > 0 ? Math.round(state.timeData.reduce((a,b) => a+b, 0) / state.timeData.length) : 0;
+
+  showScreen('resultsScreen');
+
+  // Score ring animation
+  const ring = document.getElementById('scoreRing');
+  const circumference = 502;
+  const dashOffset = circumference - (pct / 100) * circumference;
+  
+  let color;
+  if (pct >= 80) color = '#10b981';
+  else if (pct >= 50) color = '#f59e0b';
+  else color = '#ef4444';
+  
+  ring.style.stroke = color;
+  setTimeout(() => { ring.style.strokeDashoffset = dashOffset; }, 100);
+
+  // Animate percentage
+  let displayed = 0;
+  const interval = setInterval(() => {
+    displayed = Math.min(displayed + 2, pct);
+    document.getElementById('scorePct').textContent = displayed + '%';
+    if (displayed >= pct) clearInterval(interval);
+  }, 20);
+
+  // Title
+  let title, subtitle;
+  if (pct >= 90) { title = '🏆 Extraordinaire !'; subtitle = `Vous êtes un expert ! Score : ${state.score} pts`; }
+  else if (pct >= 75) { title = '⭐ Excellent travail !'; subtitle = `Très belle performance ! Score : ${state.score} pts`; }
+  else if (pct >= 60) { title = '👍 Bien joué !'; subtitle = `Vous vous en êtes bien sorti ! Score : ${state.score} pts`; }
+  else if (pct >= 40) { title = '📚 Peut mieux faire'; subtitle = `Continuez à apprendre ! Score : ${state.score} pts`; }
+  else { title = '💪 Courage !'; subtitle = `Réessayez, vous pouvez faire mieux ! Score : ${state.score} pts`; }
+
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultSubtitle').textContent = subtitle;
+  document.getElementById('correctCount').textContent = correct;
+  document.getElementById('wrongCount').textContent = total - correct;
+  document.getElementById('timeUsed').textContent = avgTime + 's';
+
+  // Streak
+  if (state.maxStreak >= 3) {
+    const sb = document.getElementById('streakBanner');
+    sb.style.display = 'flex';
+    document.getElementById('streakText').textContent = `Meilleure série : ${state.maxStreak} bonnes réponses consécutives ! 🔥`;
+  }
+
+  // Review
+  const reviewList = document.getElementById('reviewList');
+  reviewList.innerHTML = '';
+  state.answered.forEach((ans, i) => {
+    const item = document.createElement('div');
+    item.className = 'review-item ' + (ans.correct ? 'correct-item' : 'wrong-item');
+    const letters = ['A', 'B', 'C', 'D'];
+    item.innerHTML = `
+      <div class="review-q">${i+1}. ${ans.q.q}</div>
+      <div class="review-answers">
+        ${ans.q.opts.map((opt, j) => {
+          let cls = 'neutral-ans';
+          let icon = '○';
+          if (j === ans.q.ans) { cls = 'correct-ans'; icon = '✓'; }
+          if (j === ans.selected && j !== ans.q.ans) { cls = 'wrong-ans'; icon = '✗'; }
+          return `<div class="review-ans ${cls}"><span class="review-num">${letters[j]}</span>${icon} ${opt}</div>`;
+        }).join('')}
+      </div>`;
+    reviewList.appendChild(item);
+  });
+
+  if (pct >= 80) launchConfetti();
+}
+
+function launchConfetti() {
+  const colors = ['#7c3aed','#06b6d4','#f59e0b','#10b981','#ef4444','#ec4899'];
+  const container = document.getElementById('confettiContainer');
+  container.innerHTML = '';
+  for (let i = 0; i < 80; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const left = Math.random() * 100;
+    const duration = 1.5 + Math.random() * 2;
+    const delay = Math.random() * 1.5;
+    const size = 6 + Math.random() * 10;
+    piece.style.cssText = `
+      left:${left}%;
+      background:${color};
+      width:${size}px;
+      height:${size}px;
+      animation-duration:${duration}s;
+      animation-delay:${delay}s;
+      border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+    `;
+    container.appendChild(piece);
+    setTimeout(() => piece.remove(), (duration + delay) * 1000 + 500);
+  }
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && name === 'stats') || (i === 1 && name === 'review'));
+  });
+  document.getElementById('statsTab').classList.toggle('active', name === 'stats');
+  document.getElementById('reviewTab').classList.toggle('active', name === 'review');
+}
+
+function retryQuiz() {
+  startQuiz();
+}
+
+function goHome() {
+  clearInterval(state.timerInterval);
+  showScreen('homeScreen');
+  document.getElementById('confettiContainer').innerHTML = '';
+}
+
+window.showTab = showTab;
+</script>
+</body>
+</html>
