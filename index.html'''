@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuizMaster Pro — Étape 4</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   DESIGN SYSTEM
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg:       #0a0a0f;
+  --surface:  #12121a;
+  --surface2: #1a1a26;
+  --surface3: #22223a;
+  --border:   rgba(255,255,255,0.07);
+  --accent:   #7c3aed;
+  --accent2:  #06b6d4;
+  --accent3:  #f59e0b;
+  --text:     #f0f0f8;
+  --muted:    #6b7280;
+  --correct:  #10b981;
+  --wrong:    #ef4444;
+  --r:        16px;
+
+  /* Jokers */
+  --j50:    #06b6d4;
+  --jHint:  #f59e0b;
+  --jDC:    #ec4899;
+}
+
+*  { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family:'DM Sans',sans-serif;
+  background:var(--bg); color:var(--text);
+  min-height:100vh; overflow-x:hidden;
+}
+
+/* ── animated BG ── */
+.bg-canvas { position:fixed; inset:0; z-index:0; overflow:hidden; }
+.orb {
+  position:absolute; border-radius:50%;
+  filter:blur(80px); opacity:0.15;
+  animation:float 8s ease-in-out infinite;
+}
+.orb-1{width:500px;height:500px;background:var(--accent);top:-10%;left:-10%;animation-delay:0s}
+.orb-2{width:400px;height:400px;background:var(--accent2);bottom:-5%;right:-5%;animation-delay:-3s}
+.orb-3{width:300px;height:300px;background:var(--accent3);top:40%;left:60%;animation-delay:-6s}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-30px) scale(1.05)}66%{transform:translate(-20px,20px) scale(.95)}}
+.bg-canvas::after{content:'';position:absolute;inset:0;opacity:.4;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")}
+
+.app {
+  position:relative; z-index:1; min-height:100vh;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; padding:24px;
+}
+
+/* ── SCREENS ── */
+.screen{display:none;width:100%;max-width:760px;animation:slideIn .4s cubic-bezier(.34,1.56,.64,1)}
+.screen.active{display:block}
+@keyframes slideIn{from{opacity:0;transform:translateY(30px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* ── CARD ── */
+.card{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:24px; padding:48px; backdrop-filter:blur(20px);
+  box-shadow:0 32px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HOME SCREEN
+═══════════════════════════════════════════════════════════════ */
+.home-badge{
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(124,58,237,.15); border:1px solid rgba(124,58,237,.3);
+  border-radius:100px; padding:6px 16px; font-size:13px; font-weight:500;
+  color:#a78bfa; margin-bottom:32px; letter-spacing:.05em; text-transform:uppercase;
+}
+.home-badge::before{content:'✦'}
+
+h1{font-family:'Syne',sans-serif;font-size:clamp(42px,8vw,76px);font-weight:800;line-height:.95;letter-spacing:-.03em;margin-bottom:20px}
+h1 span{background:linear-gradient(135deg,#7c3aed,#06b6d4,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+.home-desc{color:var(--muted);font-size:17px;line-height:1.6;max-width:500px;margin-bottom:40px}
+
+.cat-label{font-size:11px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.category-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:28px}
+.cat-btn{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px 14px;cursor:pointer;transition:all .2s;text-align:center;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500}
+.cat-btn .cat-emoji{font-size:26px;display:block;margin-bottom:6px}
+.cat-btn:hover{border-color:var(--accent);background:rgba(124,58,237,.1);transform:translateY(-2px)}
+.cat-btn.selected{border-color:var(--accent);background:rgba(124,58,237,.2);box-shadow:0 0 20px rgba(124,58,237,.3)}
+
+.diff-row{display:flex;gap:10px;margin-bottom:24px}
+.diff-btn{flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .2s;text-align:center}
+.diff-btn:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+.diff-btn[data-diff="facile"].selected{border-color:var(--correct);background:rgba(16,185,129,.15);color:var(--correct)}
+.diff-btn[data-diff="moyen"].selected{border-color:var(--accent3);background:rgba(245,158,11,.15);color:var(--accent3)}
+.diff-btn[data-diff="difficile"].selected{border-color:var(--wrong);background:rgba(239,68,68,.15);color:var(--wrong)}
+
+/* ═══════════════════════════════════════════════════════════════
+   ÉTAPE 4 — FONCTIONNALITÉ : MODE SUDDEN DEATH
+═══════════════════════════════════════════════════════════════ */
+.mode-row{display:flex;gap:10px;margin-bottom:32px}
+.mode-btn{
+  flex:1; padding:14px 12px; border-radius:12px; border:1px solid var(--border);
+  background:var(--surface2); color:var(--muted); cursor:pointer;
+  font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500;
+  transition:all .2s; text-align:center; line-height:1.4;
+}
+.mode-btn:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+.mode-btn .mode-icon{font-size:22px;display:block;margin-bottom:4px}
+.mode-btn.selected.mode-normal{border-color:var(--accent2);background:rgba(6,182,212,.15);color:var(--accent2)}
+.mode-btn.selected.mode-sd{border-color:var(--wrong);background:rgba(239,68,68,.15);color:var(--wrong)}
+
+/* ── Feature strip ── */
+.features-strip{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:32px}
+.feat-pill{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:default;transition:transform .15s;border:1px solid}
+.feat-pill:hover{transform:translateY(-1px)}
+.feat-joker{background:rgba(6,182,212,.12);border-color:rgba(6,182,212,.3);color:var(--j50)}
+.feat-streak{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:var(--wrong)}
+.feat-badges{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);color:var(--accent3)}
+.feat-lb{background:rgba(124,58,237,.12);border-color:rgba(124,58,237,.3);color:#a78bfa}
+.feat-chart{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.3);color:var(--correct)}
+.feat-sd{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:var(--wrong)}
+.scoring-hint{font-size:11px;font-weight:400;color:var(--muted);letter-spacing:0;text-transform:none;font-family:'DM Sans',sans-serif}
+
+/* ── BUTTONS ── */
+.btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:white;border:none;border-radius:14px;padding:18px 36px;font-family:'Syne',sans-serif;font-size:16px;font-weight:700;letter-spacing:.02em;cursor:pointer;transition:all .2s;box-shadow:0 8px 32px rgba(124,58,237,.4);width:100%}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(124,58,237,.5)}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+.btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:14px;padding:14px 24px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;transition:all .2s}
+.btn-secondary:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+
+/* ═══════════════════════════════════════════════════════════════
+   QUIZ SCREEN
+═══════════════════════════════════════════════════════════════ */
+.quiz-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;gap:12px}
+.quiz-meta{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.quiz-cat-tag{background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.3);color:#a78bfa;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.q-counter{font-size:14px;color:var(--muted);font-weight:500}
+
+/* Score live */
+.score-display{display:flex;align-items:center;gap:6px;font-family:'Syne',sans-serif;font-size:17px;font-weight:700;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:6px 14px;transition:transform .2s;flex-shrink:0}
+.score-display .star{color:var(--accent3)}
+.score-display.bump{animation:scoreBump .35s cubic-bezier(.34,1.56,.64,1)}
+@keyframes scoreBump{0%{transform:scale(1)}50%{transform:scale(1.3)}100%{transform:scale(1)}}
+
+/* ── Streak multiplier badge ── */
+.streak-badge{
+  display:none; align-items:center; gap:4px;
+  background:linear-gradient(135deg,rgba(239,68,68,.2),rgba(245,158,11,.2));
+  border:1px solid rgba(239,68,68,.4);
+  border-radius:8px; padding:4px 10px;
+  font-family:'Syne',sans-serif; font-size:13px; font-weight:700;
+  color:#fca5a5; flex-shrink:0;
+  animation:pulseStreak 1.5s ease-in-out infinite;
+}
+.streak-badge.visible{display:flex}
+@keyframes pulseStreak{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* Timer */
+.timer-wrap{margin-bottom:20px}
+.timer-bar-bg{width:100%;height:6px;background:var(--surface2);border-radius:100px;overflow:hidden;margin-bottom:6px}
+.timer-bar{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width 1s linear,background .5s}
+.timer-bar.warning{background:linear-gradient(90deg,var(--accent3),var(--wrong))}
+.timer-text{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+
+/* Progress dots */
+.progress-dots{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
+.pdot{width:28px;height:6px;border-radius:100px;background:var(--surface2);transition:all .3s}
+.pdot.current{background:var(--accent);width:40px;box-shadow:0 0 10px var(--accent)}
+.pdot.correct{background:var(--correct)}
+.pdot.wrong{background:var(--wrong)}
+
+/* Question */
+.question-num{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.question-text{font-family:'Syne',sans-serif;font-size:clamp(18px,3vw,24px);font-weight:700;line-height:1.3;margin-bottom:24px;letter-spacing:-.01em}
+
+/* ═══════════════════════════════════════════════════════════════
+   ÉTAPE 4 — FONCTIONNALITÉ : JOKERS (BOUÉES DE SAUVETAGE)
+═══════════════════════════════════════════════════════════════ */
+.lifelines-bar{
+  display:flex; gap:10px; margin-bottom:20px;
+  padding:14px 16px;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:14px; align-items:center;
+}
+.lifelines-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:4px;flex-shrink:0}
+.ll-btn{
+  display:flex; align-items:center; gap:6px;
+  padding:8px 14px; border-radius:10px; border:none; cursor:pointer;
+  font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
+  transition:all .2s; position:relative;
+}
+.ll-btn:disabled{opacity:.3;cursor:not-allowed;filter:grayscale(1)}
+.ll-btn-5050{background:rgba(6,182,212,.15);color:var(--j50);border:1px solid rgba(6,182,212,.35)}
+.ll-btn-5050:hover:not(:disabled){background:rgba(6,182,212,.25);transform:translateY(-1px)}
+.ll-btn-hint{background:rgba(245,158,11,.15);color:var(--jHint);border:1px solid rgba(245,158,11,.35)}
+.ll-btn-hint:hover:not(:disabled){background:rgba(245,158,11,.25);transform:translateY(-1px)}
+.ll-btn-dc{background:rgba(236,72,153,.15);color:var(--jDC);border:1px solid rgba(236,72,153,.35)}
+.ll-btn-dc:hover:not(:disabled){background:rgba(236,72,153,.25);transform:translateY(-1px)}
+.ll-used-dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.5}
+
+/* Hint panel */
+.hint-panel{
+  background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25);
+  border-radius:12px; padding:14px 18px; margin-bottom:16px;
+  display:none; animation:fadeUp .3s;
+}
+.hint-panel.show{display:flex;align-items:flex-start;gap:10px}
+.hint-icon{font-size:20px;flex-shrink:0}
+.hint-text{font-size:14px;color:var(--accent3);line-height:1.5}
+
+/* Double Chance badge */
+.dc-badge{
+  display:none; align-items:center; gap:6px;
+  background:rgba(236,72,153,.12); border:1px solid rgba(236,72,153,.3);
+  border-radius:8px; padding:5px 12px; font-size:12px; font-weight:600;
+  color:var(--jDC); margin-bottom:12px;
+}
+.dc-badge.show{display:flex}
+
+/* Options */
+.options-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.option-btn{
+  background:var(--surface2); border:2px solid var(--border); border-radius:14px;
+  padding:16px 18px; cursor:pointer; text-align:left; color:var(--text);
+  font-family:'DM Sans',sans-serif; font-size:14px; font-weight:400;
+  transition:all .2s; display:flex; align-items:center; gap:12px;
+  position:relative; overflow:hidden;
+}
+.option-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(124,58,237,.1),transparent);opacity:0;transition:opacity .2s}
+.option-btn:hover:not(:disabled)::before{opacity:1}
+.option-btn:hover:not(:disabled){border-color:rgba(124,58,237,.5);transform:translateY(-1px)}
+.option-btn:disabled{cursor:default}
+.option-btn.eliminated{opacity:.2;pointer-events:none}
+
+.opt-letter{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;flex-shrink:0;transition:all .2s}
+.option-btn.correct{border-color:var(--correct);background:rgba(16,185,129,.1)}
+.option-btn.correct .opt-letter{background:var(--correct);border-color:var(--correct);color:white}
+.option-btn.wrong{border-color:var(--wrong);background:rgba(239,68,68,.1)}
+.option-btn.wrong .opt-letter{background:var(--wrong);border-color:var(--wrong);color:white}
+.option-btn.selected-correct{animation:bounceCorrect .5s}
+.option-btn.selected-wrong{animation:shakeWrong .4s}
+@keyframes bounceCorrect{0%{transform:scale(1)}40%{transform:scale(1.04)}100%{transform:scale(1)}}
+@keyframes shakeWrong{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}60%{transform:translateX(6px)}}
+
+/* Feedback */
+.feedback-panel{border-radius:14px;padding:18px 22px;margin-bottom:16px;display:none;animation:fadeUp .3s;border:1px solid var(--border)}
+.feedback-panel.show{display:flex;align-items:flex-start;gap:14px}
+.feedback-panel.feedback-correct{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.35)}
+.feedback-panel.feedback-wrong{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.35)}
+.feedback-panel.feedback-timeout{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.35)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.feedback-icon{font-size:26px;flex-shrink:0}
+.feedback-body{flex:1}
+.feedback-title{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:4px}
+.feedback-title.correct-text{color:var(--correct)}
+.feedback-title.wrong-text{color:var(--wrong)}
+.feedback-title.timeout-text{color:var(--accent3)}
+.feedback-explain{font-size:13px;color:var(--muted);line-height:1.5}
+.points-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:var(--correct);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;margin-top:5px}
+
+.quiz-actions{display:flex;gap:10px}
+
+/* ═══════════════════════════════════════════════════════════════
+   RÉSULTATS
+═══════════════════════════════════════════════════════════════ */
+.result-hero{text-align:center;margin-bottom:40px}
+.score-ring-wrap{position:relative;width:170px;height:170px;margin:0 auto 24px}
+.score-ring-svg{transform:rotate(-90deg)}
+.score-ring-bg{fill:none;stroke:var(--surface2);stroke-width:12}
+.score-ring-fill{fill:none;stroke-width:12;stroke-linecap:round;stroke-dasharray:502;stroke-dashoffset:502;transition:stroke-dashoffset 1.5s cubic-bezier(.34,1.56,.64,1)}
+.score-ring-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-pct{font-family:'Syne',sans-serif;font-size:42px;font-weight:800;line-height:1;letter-spacing:-.04em}
+.score-pct-label{font-size:11px;color:var(--muted);margin-top:4px}
+.result-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:8px}
+.result-subtitle{color:var(--muted);font-size:15px}
+
+/* Score banner */
+.final-score-banner{display:flex;align-items:center;justify-content:center;gap:20px;background:linear-gradient(135deg,rgba(124,58,237,.15),rgba(6,182,212,.1));border:1px solid rgba(124,58,237,.3);border-radius:16px;padding:20px 28px;margin-bottom:28px;text-align:center}
+.final-score-value{font-family:'Syne',sans-serif;font-size:46px;font-weight:800;background:linear-gradient(135deg,#7c3aed,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+.final-score-label{font-size:13px;color:var(--muted);margin-top:4px}
+.divider-v{width:1px;height:50px;background:var(--border)}
+
+/* ═══════════════════════════════════════════════════════════════
+   ÉTAPE 4 — FONCTIONNALITÉ : BADGES / ACHIEVEMENTS
+═══════════════════════════════════════════════════════════════ */
+.achievements-section{margin-bottom:28px}
+.achievements-title{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.achievements-grid{display:flex;flex-wrap:wrap;gap:8px}
+.ach-badge{
+  display:flex; align-items:center; gap:8px;
+  padding:8px 14px; border-radius:30px; font-size:13px; font-weight:600;
+  animation:popIn .4s cubic-bezier(.34,1.56,.64,1);
+}
+.ach-badge.locked{opacity:.25;filter:grayscale(1);background:var(--surface2);border:1px solid var(--border);color:var(--muted)}
+.ach-badge.unlocked{border:1px solid;animation:popIn .4s cubic-bezier(.34,1.56,.64,1)}
+.ach-icon{font-size:18px}
+@keyframes popIn{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* Couleurs par badge */
+.ach-gold{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.4);color:var(--accent3)}
+.ach-green{background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.4);color:var(--correct)}
+.ach-purple{background:rgba(124,58,237,.15);border-color:rgba(124,58,237,.4);color:#a78bfa}
+.ach-red{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:var(--wrong)}
+.ach-cyan{background:rgba(6,182,212,.15);border-color:rgba(6,182,212,.4);color:var(--accent2)}
+.ach-pink{background:rgba(236,72,153,.15);border-color:rgba(236,72,153,.4);color:#f9a8d4}
+
+/* ── Stat cards ── */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px}
+.stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center}
+.stat-value{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;line-height:1;margin-bottom:5px}
+.stat-label{font-size:12px;color:var(--muted)}
+.stat-card.good .stat-value{color:var(--correct)}
+.stat-card.bad  .stat-value{color:var(--wrong)}
+.stat-card.neutral .stat-value{color:var(--accent2)}
+
+/* ── streak banner ── */
+.streak-banner-res{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(239,68,68,.1));border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:14px;font-weight:500}
+.streak-fire{font-size:26px}
+
+/* ─── TABS ─── */
+.tabs{display:flex;gap:4px;background:var(--surface2);border-radius:12px;padding:4px;margin-bottom:24px}
+.tab-btn{flex:1;padding:10px;border:none;background:transparent;color:var(--muted);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s}
+.tab-btn.active{background:var(--surface);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ═══════════════════════════════════════════════════════════════
+   ÉTAPE 4 — FONCTIONNALITÉ : CLASSEMENT (LEADERBOARD)
+═══════════════════════════════════════════════════════════════ */
+.leaderboard-list{display:flex;flex-direction:column;gap:8px}
+.lb-entry{
+  display:flex; align-items:center; gap:14px;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:12px; padding:14px 18px; transition:all .2s;
+  position:relative; overflow:hidden;
+}
+.lb-entry.is-current{border-color:rgba(124,58,237,.5);background:rgba(124,58,237,.08)}
+.lb-entry.is-current::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.lb-rank{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;width:36px;flex-shrink:0;text-align:center}
+.lb-rank.gold{color:var(--accent3)}
+.lb-rank.silver{color:#94a3b8}
+.lb-rank.bronze{color:#a16207}
+.lb-info{flex:1}
+.lb-name{font-weight:600;font-size:14px}
+.lb-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.lb-score{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent3)}
+.lb-badge{font-size:18px}
+.lb-empty{text-align:center;padding:32px;color:var(--muted);font-size:14px}
+
+/* ═══════════════════════════════════════════════════════════════
+   ÉTAPE 4 — FONCTIONNALITÉ : GRAPHIQUE DE PROGRESSION
+═══════════════════════════════════════════════════════════════ */
+.progress-chart{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:24px}
+.chart-title{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.chart-bars{display:flex;align-items:flex-end;gap:6px;height:80px}
+.chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.chart-bar{width:100%;border-radius:4px 4px 0 0;transition:height .8s cubic-bezier(.34,1.56,.64,1);min-height:4px}
+.chart-bar.bar-correct{background:linear-gradient(180deg,var(--correct),rgba(16,185,129,.4))}
+.chart-bar.bar-wrong{background:linear-gradient(180deg,var(--wrong),rgba(239,68,68,.4))}
+.chart-bar.bar-skip{background:linear-gradient(180deg,var(--accent3),rgba(245,158,11,.4))}
+.chart-label{font-size:10px;color:var(--muted);font-weight:600}
+
+/* Révision */
+.review-item{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:10px}
+.review-item.correct-item{border-left:4px solid var(--correct)}
+.review-item.wrong-item{border-left:4px solid var(--wrong)}
+.review-status{display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.review-status.ok{background:rgba(16,185,129,.15);color:var(--correct);border:1px solid rgba(16,185,129,.3)}
+.review-status.ko{background:rgba(239,68,68,.15);color:var(--wrong);border:1px solid rgba(239,68,68,.3)}
+.review-status.sk{background:rgba(245,158,11,.15);color:var(--accent3);border:1px solid rgba(245,158,11,.3)}
+.review-q{font-family:'Syne',sans-serif;font-weight:600;font-size:14px;margin-bottom:10px;line-height:1.4}
+.review-answers{display:flex;flex-direction:column;gap:5px}
+.review-ans{display:flex;align-items:center;gap:8px;font-size:13px;padding:7px 11px;border-radius:7px}
+.review-ans.correct-ans{background:rgba(16,185,129,.1);color:var(--correct)}
+.review-ans.wrong-ans{background:rgba(239,68,68,.1);color:var(--wrong)}
+.review-ans.neutral-ans{color:var(--muted)}
+.review-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;background:rgba(255,255,255,.06);font-size:11px;font-weight:700;flex-shrink:0}
+.review-exp{margin-top:10px;padding:10px 13px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.15);border-radius:7px;font-size:12px;color:var(--muted);line-height:1.5}
+.review-exp strong{color:#a78bfa}
+
+.result-actions{display:flex;gap:12px}
+
+/* ── SUDDEN DEATH overlay ── */
+.sd-overlay{
+  position:fixed;inset:0;z-index:999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(10,10,15,.95);backdrop-filter:blur(8px);
+  animation:fadeIn .3s;
+}
+.sd-overlay.hidden{display:none}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.sd-content{text-align:center;max-width:400px;padding:24px}
+.sd-icon{font-size:80px;margin-bottom:20px;animation:sdShake .5s}
+@keyframes sdShake{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+.sd-title{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;color:var(--wrong);margin-bottom:12px}
+.sd-sub{color:var(--muted);font-size:16px;line-height:1.5;margin-bottom:28px}
+
+/* ── Toast de achievement ── */
+.toast-container{position:fixed;top:20px;right:20px;z-index:500;display:flex;flex-direction:column;gap:8px}
+.toast{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:14px 18px;
+  display:flex;align-items:center;gap:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  animation:toastIn .4s cubic-bezier(.34,1.56,.64,1) forwards;
+  min-width:280px;max-width:320px;
+}
+.toast.toast-out{animation:toastOut .3s ease forwards}
+@keyframes toastIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes toastOut{from{transform:translateX(0);opacity:1}to{transform:translateX(110%);opacity:0}}
+.toast-icon{font-size:24px;flex-shrink:0}
+.toast-body .toast-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px}
+.toast-body .toast-sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* Confetti */
+.confetti-container{position:fixed;inset:0;pointer-events:none;z-index:100}
+.confetti-piece{position:absolute;width:10px;height:10px;top:-20px;border-radius:2px;animation:confettiFall linear forwards}
+@keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+
+@media(max-width:600px){
+  .card{padding:24px 16px;border-radius:18px}
+  .category-grid{grid-template-columns:repeat(2,1fr)}
+  .options-grid{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr}
+  .result-actions{flex-direction:column}
+  h1{font-size:38px}
+  .lifelines-bar{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<!-- Animated BG -->
+<div class="bg-canvas">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- Confettis -->
+<div class="confetti-container" id="confettiContainer"></div>
+
+<!-- Toasts achievements -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Sudden Death overlay -->
+<div class="sd-overlay hidden" id="sdOverlay">
+  <div class="sd-content">
+    <div class="sd-icon">💀</div>
+    <div class="sd-title">Sudden Death !</div>
+    <div class="sd-sub" id="sdMsg">Vous avez répondu incorrectement.<br>Le quiz se termine ici.</div>
+    <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:12px;padding:12px 18px;margin-bottom:20px;font-size:13px;color:#fca5a5;line-height:1.6">
+      ℹ️ En mode <strong>Sudden Death</strong>, une seule erreur ou un délai dépassé met immédiatement fin au quiz. Vos réponses correctes sont tout de même comptabilisées dans les résultats.
+    </div>
+    <div style="display:flex;gap:12px;justify-content:center">
+      <button class="btn-secondary" id="sdHome" style="width:auto;padding:14px 24px">← Retour à l'accueil</button>
+      <button class="btn-primary" id="sdResults" style="width:auto;padding:14px 24px">Voir mes résultats →</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN ACCUEIL
+══════════════════════════════════════════ -->
+<div class="screen active" id="homeScreen">
+  <div class="card">
+    <div class="home-badge">Quiz Master Pro — Étape 4</div>
+    <h1>Testez vos<br><span>connaissances</span></h1>
+    <p class="home-desc">180 questions réparties en 6 catégories et 3 niveaux de difficulté. Utilisez vos jokers avec sagesse, enchaînez les bonnes réponses pour décupler vos points et grimpez au classement !</p>
+
+    <!-- Présentation des nouvelles fonctionnalités -->
+    <div class="features-strip">
+      <div class="feat-pill feat-joker" title="Trois bouées de sauvetage par quiz">🎯 3 Jokers</div>
+      <div class="feat-pill feat-streak" title="Multipliez vos points en série">🔥 Multiplicateur ×2</div>
+      <div class="feat-pill feat-badges" title="8 badges à débloquer selon vos performances">🏅 8 Badges</div>
+      <div class="feat-pill feat-lb"    title="Classement sauvegardé pour toute la session">🏆 Classement</div>
+      <div class="feat-pill feat-chart" title="Graphique de vos temps de réponse">📈 Graphique</div>
+      <div class="feat-pill feat-sd"    title="Mode où une seule erreur met fin au quiz">💀 Sudden Death</div>
+    </div>
+
+    <div class="cat-label">Choisissez une catégorie</div>
+    <div class="category-grid" id="catGrid">
+      <button class="cat-btn" data-cat="science"><span class="cat-emoji">🔬</span>Sciences</button>
+      <button class="cat-btn" data-cat="histoire"><span class="cat-emoji">🏛️</span>Histoire</button>
+      <button class="cat-btn" data-cat="geo"><span class="cat-emoji">🌍</span>Géographie</button>
+      <button class="cat-btn" data-cat="tech"><span class="cat-emoji">💻</span>Technologie</button>
+      <button class="cat-btn" data-cat="culture"><span class="cat-emoji">🎨</span>Culture</button>
+      <button class="cat-btn" data-cat="sport"><span class="cat-emoji">⚽</span>Sport</button>
+    </div>
+
+    <div class="cat-label">Niveau de difficulté <span class="scoring-hint">( base : 100 / 150 / 200 pts + bonus vitesse )</span></div>
+    <div class="diff-row" id="diffRow">
+      <button class="diff-btn" data-diff="facile">😊 Facile</button>
+      <button class="diff-btn selected" data-diff="moyen">🎯 Moyen</button>
+      <button class="diff-btn" data-diff="difficile">🔥 Difficile</button>
+    </div>
+
+    <div class="cat-label">Mode de jeu</div>
+    <div class="mode-row" id="modeRow">
+      <button class="mode-btn mode-normal selected" data-mode="normal">
+        <span class="mode-icon">🎮</span>
+        <strong>Mode Normal</strong><br>
+        <span style="font-size:12px;color:var(--muted)">3 jokers disponibles · Aucune pénalité</span>
+      </button>
+      <button class="mode-btn mode-sd" data-mode="sudden_death">
+        <span class="mode-icon">💀</span>
+        <strong>Sudden Death</strong><br>
+        <span style="font-size:12px;color:var(--muted)">Une seule erreur met fin au quiz</span>
+      </button>
+    </div>
+
+    <button class="btn-primary" id="startBtn" disabled>Sélectionnez une catégorie pour démarrer</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN QUIZ
+══════════════════════════════════════════ -->
+<div class="screen" id="quizScreen">
+  <div class="card">
+    <div class="quiz-header">
+      <div class="quiz-meta">
+        <span class="quiz-cat-tag" id="quizCatTag">—</span>
+        <span class="q-counter" id="qCounter">Q 1 / 10</span>
+      </div>
+      <div class="streak-badge" id="streakBadge">🔥 ×<span id="streakMult">1</span></div>
+      <div class="score-display" id="scoreDisplay">
+        <span class="star">★</span>
+        <span id="liveScore">0</span>
+        <span style="font-size:11px;color:var(--muted);font-weight:400">pts</span>
+      </div>
+    </div>
+
+    <!-- Timer -->
+    <div class="timer-wrap">
+      <div class="timer-bar-bg"><div class="timer-bar" id="timerBar"></div></div>
+      <div class="timer-text"><span>Temps restant</span><span id="timerText">20s</span></div>
+    </div>
+
+    <div class="progress-dots" id="progressDots"></div>
+
+    <!-- JOKERS — 3 bouées de sauvetage, utilisables une seule fois chacune -->
+    <div class="lifelines-bar">
+      <span class="lifelines-label">🎯 Jokers</span>
+      <button class="ll-btn ll-btn-5050" id="ll5050" title="Élimine 2 mauvaises réponses sur 4">
+        <span>50:50</span>
+        <span style="font-size:10px;opacity:.7;display:block;line-height:1">Éliminer 2</span>
+        <div class="ll-used-dot" id="dot5050" style="display:none"></div>
+      </button>
+      <button class="ll-btn ll-btn-hint" id="llHint" title="Affiche un indice pour orienter votre réponse">
+        <span>💡 Indice</span>
+        <span style="font-size:10px;opacity:.7;display:block;line-height:1">Afficher un indice</span>
+        <div class="ll-used-dot" id="dotHint" style="display:none"></div>
+      </button>
+      <button class="ll-btn ll-btn-dc" id="llDC" title="Vous donne le droit à une 2ème tentative si vous vous trompez">
+        <span>💗 2e chance</span>
+        <span style="font-size:10px;opacity:.7;display:block;line-height:1">Retenter si erreur</span>
+        <div class="ll-used-dot" id="dotDC" style="display:none"></div>
+      </button>
+    </div>
+
+    <!-- Double chance active badge -->
+    <div class="dc-badge" id="dcBadge">💗 Double Chance active — votre première erreur ne compte pas, réessayez !</div>
+
+    <!-- Hint panel -->
+    <div class="hint-panel" id="hintPanel">
+      <span class="hint-icon">💡</span>
+      <span class="hint-text" id="hintText"></span>
+    </div>
+
+    <div class="question-num"  id="questionNum">Question 1</div>
+    <div class="question-text" id="questionText"></div>
+    <div class="options-grid"  id="optionsGrid"></div>
+
+    <div class="feedback-panel" id="feedbackPanel">
+      <div class="feedback-icon" id="feedbackIcon"></div>
+      <div class="feedback-body">
+        <div class="feedback-title"   id="feedbackTitle"></div>
+        <div class="feedback-explain" id="feedbackExplain"></div>
+        <div id="pointsBadgeWrap"></div>
+      </div>
+    </div>
+
+    <div class="quiz-actions">
+      <button class="btn-secondary" id="skipBtn">Passer</button>
+      <button class="btn-primary"   id="nextBtn" disabled style="flex:1">Suivant →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN RÉSULTATS
+══════════════════════════════════════════ -->
+<div class="screen" id="resultsScreen">
+  <div class="card">
+    <div class="result-hero">
+      <div class="score-ring-wrap">
+        <svg class="score-ring-svg" width="170" height="170" viewBox="0 0 170 170">
+          <circle class="score-ring-bg"   cx="85" cy="85" r="75"/>
+          <circle class="score-ring-fill" cx="85" cy="85" r="75" id="scoreRing"/>
+        </svg>
+        <div class="score-ring-inner">
+          <div class="score-pct"       id="scorePct">0%</div>
+          <div class="score-pct-label">réussite</div>
+        </div>
+      </div>
+      <div class="result-title"    id="resultTitle">—</div>
+      <div class="result-subtitle" id="resultSubtitle"></div>
+    </div>
+
+    <!-- Score total -->
+    <div class="final-score-banner">
+      <div>
+        <div class="final-score-value" id="finalScoreValue">0</div>
+        <div class="final-score-label">Score total</div>
+      </div>
+      <div class="divider-v"></div>
+      <div style="text-align:center">
+        <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent2)" id="diffLabel"></div>
+        <div class="final-score-label">Difficulté</div>
+      </div>
+      <div class="divider-v"></div>
+      <div style="text-align:center">
+        <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--jDC)" id="modeLabel"></div>
+        <div class="final-score-label">Mode</div>
+      </div>
+    </div>
+
+    <!-- Achievements -->
+    <div class="achievements-section">
+      <div class="achievements-title">🏅 Badges débloqués cette partie</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Les badges grisés n'ont pas encore été débloqués. Rejouez pour les obtenir tous !</div>
+      <div class="achievements-grid" id="achievementsGrid"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tabStats">📊 Stats</button>
+      <button class="tab-btn"        id="tabChart">📈 Progression</button>
+      <button class="tab-btn"        id="tabReview">🔍 Révision</button>
+      <button class="tab-btn"        id="tabLB">🏆 Classement</button>
+    </div>
+
+    <div class="tab-content active" id="statsTab">
+      <div class="stats-grid">
+        <div class="stat-card good"><div class="stat-value" id="correctCount">0</div><div class="stat-label">✅ Correctes</div></div>
+        <div class="stat-card bad"><div class="stat-value" id="wrongCount">0</div><div class="stat-label">❌ Incorrectes</div></div>
+        <div class="stat-card neutral"><div class="stat-value" id="timeUsed">0s</div><div class="stat-label">⏱ Temps moy./question</div></div>
+      </div>
+      <!-- Explication du système de score -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:16px;font-size:13px;color:var(--muted);line-height:1.7">
+        <div style="font-weight:600;color:var(--text);margin-bottom:6px">⚙️ Comment est calculé votre score ?</div>
+        <div>• <strong style="color:var(--text)">Points de base</strong> : 100 (facile) · 150 (moyen) · 200 (difficile)</div>
+        <div>• <strong style="color:var(--text)">Bonus de vitesse</strong> : jusqu'à +50 pts selon le temps restant</div>
+        <div>• <strong style="color:var(--text)">Multiplicateur de série</strong> : ×1.5 à partir de 3 bonnes réponses consécutives · ×2 à partir de 7</div>
+        <div>• <strong style="color:var(--text)">Jokers</strong> : l'utilisation d'un joker ne pénalise pas les points</div>
+      </div>
+      <div class="streak-banner-res" id="streakBannerRes" style="display:none">
+        <span class="streak-fire">🔥</span><span id="streakTextRes"></span>
+      </div>
+    </div>
+
+    <div class="tab-content" id="chartTab">
+      <div class="progress-chart">
+        <div class="chart-title">Temps de réponse par question</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Chaque barre représente le temps mis pour répondre à une question. Plus la barre est haute, plus vous avez pris de temps. La couleur indique le résultat obtenu.</div>
+        <div class="chart-bars" id="chartBars"></div>
+        <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:12px;height:12px;border-radius:3px;background:var(--correct);display:inline-block"></span>Bonne réponse</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:12px;height:12px;border-radius:3px;background:var(--wrong);display:inline-block"></span>Mauvaise réponse</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:12px;height:12px;border-radius:3px;background:var(--accent3);display:inline-block"></span>Question passée</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="reviewTab">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5">
+        Retrouvez ci-dessous chaque question avec votre réponse, la bonne réponse mise en évidence et une explication détaillée.
+      </div>
+      <div id="reviewList"></div>
+    </div>
+
+    <div class="tab-content" id="lbTab">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5">
+        🏆 Classement des <strong style="color:var(--text)">10 meilleures parties</strong> de cette session. Votre partie en cours est surlignée en violet. Le classement se réinitialise à la fermeture de la page.
+      </div>
+      <div class="leaderboard-list" id="leaderboardList"></div>
+    </div>
+
+    <div class="result-actions" style="margin-top:8px">
+      <button class="btn-secondary" id="homeBtn">← Accueil</button>
+      <button class="btn-primary"   id="retryBtn" style="flex:1">Rejouer ↺</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- .app -->
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   BANQUE DE QUESTIONS (6 catégories × 3 niveaux × 10 questions)
+   Chaque question possède un champ `hint` pour le joker "Indice"
+════════════════════════════════════════════════════════════════ */
+const QUESTIONS = {
+  science:{
+    facile:[
+      {q:"Quelle planète est la plus proche du Soleil ?",opts:["Mercure","Vénus","Mars","Jupiter"],ans:0,exp:"Mercure est la planète la plus proche du Soleil avec une orbite d'environ 58 millions de km.",hint:"Elle est aussi la plus petite planète du système solaire."},
+      {q:"Quel est le symbole chimique de l'eau ?",opts:["H2O","CO2","O2","HO"],ans:0,exp:"L'eau est composée de 2 atomes d'hydrogène et 1 atome d'oxygène, d'où H₂O.",hint:"Elle contient deux types d'atomes différents."},
+      {q:"Combien d'os contient le corps humain adulte ?",opts:["206","208","204","210"],ans:0,exp:"Le squelette humain adulte compte 206 os, contre 270-350 à la naissance.",hint:"Le chiffre est situé entre 200 et 210."},
+      {q:"Quelle est la vitesse de la lumière dans le vide ?",opts:["300 000 km/s","150 000 km/s","500 000 km/s","200 000 km/s"],ans:0,exp:"La lumière se déplace à environ 299 792 km/s dans le vide.",hint:"C'est la vitesse limite de l'univers selon Einstein."},
+      {q:"Quel gaz représente 78% de l'atmosphère terrestre ?",opts:["Azote","Oxygène","CO2","Argon"],ans:0,exp:"L'azote (N₂) constitue environ 78% de l'atmosphère, l'oxygène 21%.",hint:"Ce n'est pas l'oxygène que nous respirons."},
+      {q:"Quel est le plus grand organe du corps humain ?",opts:["La peau","Le foie","Le cœur","Les poumons"],ans:0,exp:"La peau est le plus grand organe avec une superficie d'environ 2m².",hint:"Vous le voyez tous les jours en vous regardant."},
+      {q:"Comment s'appelle l'organite qui contient l'ADN ?",opts:["Noyau","Mitochondrie","Ribosome","Cytoplasme"],ans:0,exp:"Le noyau cellulaire est l'organite qui contient le matériel génétique (ADN).",hint:"Il est au centre de la cellule."},
+      {q:"Quel scientifique a développé la théorie de la relativité ?",opts:["Albert Einstein","Isaac Newton","Niels Bohr","Marie Curie"],ans:0,exp:"Albert Einstein a développé la théorie de la relativité spéciale (1905) et générale (1915).",hint:"E = mc² est sa formule la plus célèbre."},
+      {q:"De quoi est composé le Soleil principalement ?",opts:["Hydrogène et Hélium","Oxygène et Carbone","Azote et Argon","Fer et Nickel"],ans:0,exp:"Le Soleil est composé à 73% d'hydrogène et 25% d'hélium.",hint:"Ces deux éléments sont les plus légers du tableau périodique."},
+      {q:"Quelle est la formule chimique du sel de table ?",opts:["NaCl","KCl","MgCl2","CaCl2"],ans:0,exp:"Le sel de table est du chlorure de sodium, de formule NaCl.",hint:"Na est le symbole du Sodium."},
+    ],
+    moyen:[
+      {q:"Quel scientifique a découvert la pénicilline ?",opts:["Alexander Fleming","Louis Pasteur","Robert Koch","Paul Ehrlich"],ans:0,exp:"Alexander Fleming a découvert la pénicilline en 1928.",hint:"Il a observé une moisissure détruisant des bactéries."},
+      {q:"Quelle particule donne à un atome sa charge positive ?",opts:["Proton","Neutron","Électron","Photon"],ans:0,exp:"Le proton porte une charge électrique positive (+1).",hint:"Elle se trouve dans le noyau de l'atome."},
+      {q:"Quel est le pH neutre d'une solution aqueuse ?",opts:["7","0","14","5"],ans:0,exp:"Un pH de 7 est neutre. En dessous c'est acide, au-dessus c'est basique.",hint:"C'est aussi le pH de l'eau pure."},
+      {q:"Combien de chromosomes possède une cellule humaine normale ?",opts:["46","23","48","44"],ans:0,exp:"Les cellules humaines ont 46 chromosomes regroupés en 23 paires.",hint:"Les gamètes en ont la moitié."},
+      {q:"Quel est le principal gaz à effet de serre d'origine humaine ?",opts:["CO2","Méthane","N2O","Vapeur d'eau"],ans:0,exp:"Le CO2 représente ~76% des émissions anthropiques.",hint:"C'est ce que nous expirons."},
+      {q:"En biologie, qu'est-ce que la mitose ?",opts:["Division cellulaire","Respiration","Photosynthèse","Digestion"],ans:0,exp:"La mitose produit deux cellules filles identiques.",hint:"Elle permet la croissance et la réparation des tissus."},
+      {q:"Quelle est la loi qui décrit les gaz idéaux ?",opts:["PV = nRT","F = ma","E = mc²","V = IR"],ans:0,exp:"PV=nRT relie pression, volume, moles, constante et température.",hint:"Elle comporte 5 variables."},
+      {q:"Quel élément a le numéro atomique 1 ?",opts:["Hydrogène","Hélium","Lithium","Carbone"],ans:0,exp:"L'hydrogène (H) est l'élément de numéro atomique 1.",hint:"C'est l'élément le plus léger et le plus abondant de l'univers."},
+      {q:"Qu'est-ce que la photosynthèse produit en plus du glucose ?",opts:["Oxygène","CO2","Azote","Eau"],ans:0,exp:"La photosynthèse produit du glucose et de l'oxygène.",hint:"C'est ce que nous respirons."},
+      {q:"Quel type de radiation a la longueur d'onde la plus courte ?",opts:["Rayons gamma","Rayons X","UV","Visible"],ans:0,exp:"Les rayons gamma ont les longueurs d'onde les plus courtes (<0.01 nm).",hint:"Ils sont émis par les noyaux radioactifs."},
+    ],
+    difficile:[
+      {q:"Quel est le principe d'incertitude d'Heisenberg ?",opts:["Δx·Δp ≥ ħ/2","E = mc²","F = ma","PV = nRT"],ans:0,exp:"On ne peut pas connaître simultanément la position et la quantité de mouvement.",hint:"Il concerne la mécanique quantique."},
+      {q:"Quelle enzyme est responsable de la synthèse de l'ADN ?",opts:["ADN polymérase","ARN polymérase","Ligase","Hélicase"],ans:0,exp:"L'ADN polymérase synthétise de nouveaux brins d'ADN.",hint:"Son nom contient le nom de la molécule qu'elle fabrique."},
+      {q:"Que mesure la constante de Planck ?",opts:["Quantum d'action","Vitesse lumière","Charge électron","Masse proton"],ans:0,exp:"h ≈ 6.626×10⁻³⁴ J·s est la constante quantique d'action.",hint:"Elle a les unités de J·s (joule-seconde)."},
+      {q:"Dans quel organite se déroule le cycle de Krebs ?",opts:["Mitochondrie","Chloroplaste","Réticulum","Noyau"],ans:0,exp:"Le cycle de Krebs se déroule dans la matrice mitochondriale.",hint:"C'est la centrale énergétique de la cellule."},
+      {q:"Quelle est la valeur approximative de la constante de Hubble ?",opts:["70 km/s/Mpc","100 km/s/Mpc","50 km/s/Mpc","200 km/s/Mpc"],ans:0,exp:"La constante de Hubble H₀ ≈ 67-73 km/s/Mpc décrit l'expansion de l'univers.",hint:"Elle décrit comment l'univers s'étend."},
+      {q:"Qu'est-ce que l'effet tunnel en physique quantique ?",opts:["Passer une barrière d'énergie","Dualité onde-corpuscule","Intrication quantique","Superposition d'états"],ans:0,exp:"L'effet tunnel permet à une particule de traverser une barrière classiquement infranchissable.",hint:"Il est exploité dans les transistors modernes."},
+      {q:"Quel type de liaison chimique est la plus forte ?",opts:["Covalente","Ionique","Hydrogène","Van der Waals"],ans:0,exp:"Les liaisons covalentes (partage d'électrons) sont les plus fortes.",hint:"Elle implique un partage d'électrons."},
+      {q:"La constante d'Avogadro représente :",opts:["Nb de particules par mole","Charge d'un électron","Masse d'un proton","Constante des gaz"],ans:0,exp:"Nₐ ≈ 6.022×10²³ est le nombre d'entités dans une mole.",hint:"Elle vaut environ 6×10²³."},
+      {q:"Quel phénomène quantique permet la superposition d'états ?",opts:["Superposition quantique","Intrication","Décoherence","Tunneling"],ans:0,exp:"La superposition quantique permet à une particule d'exister dans plusieurs états simultanément.",hint:"Le chat de Schrödinger illustre ce principe."},
+      {q:"Quel est le nom de la force qui lie les quarks dans un proton ?",opts:["Force chromodynamique","Force faible","Force électromagnétique","Gravité"],ans:0,exp:"La chromodynamique quantique décrit l'interaction forte entre quarks via les gluons.",hint:"Elle est médiée par des particules appelées gluons."},
+    ]
+  },
+  histoire:{
+    facile:[
+      {q:"En quelle année a débuté la Première Guerre Mondiale ?",opts:["1914","1918","1939","1910"],ans:0,exp:"La Première Guerre Mondiale a commencé le 28 juillet 1914.",hint:"C'est l'année de l'assassinat de l'Archiduc François-Ferdinand."},
+      {q:"Qui était le premier président des États-Unis ?",opts:["George Washington","Abraham Lincoln","Thomas Jefferson","John Adams"],ans:0,exp:"George Washington fut le premier président américain, de 1789 à 1797.",hint:"Son portrait figure sur le billet d'un dollar."},
+      {q:"Où s'est déroulé le débarquement du 6 juin 1944 ?",opts:["Normandie","Bretagne","Provence","Pas-de-Calais"],ans:0,exp:"L'Opération Overlord a eu lieu en Normandie.",hint:"La région est en nord-ouest de la France."},
+      {q:"En quelle année a chuté le mur de Berlin ?",opts:["1989","1991","1985","1990"],ans:0,exp:"Le mur de Berlin est tombé le 9 novembre 1989.",hint:"C'est la même année que la chute des régimes communistes en Europe de l'Est."},
+      {q:"Qui a peint La Joconde ?",opts:["Léonard de Vinci","Michel-Ange","Raphaël","Botticelli"],ans:0,exp:"La Joconde a été peinte par Léonard de Vinci entre 1503 et 1519.",hint:"Il était aussi architecte, scientifique et inventeur."},
+      {q:"Quelle civilisation a construit les pyramides de Gizeh ?",opts:["Égyptienne","Mésopotamienne","Romaine","Grecque"],ans:0,exp:"Les pyramides de Gizeh ont été construites par l'Égypte antique vers 2560 av. J.-C.",hint:"Cette civilisation utilisait les hiéroglyphes."},
+      {q:"Qui a découvert l'Amérique en 1492 ?",opts:["Christophe Colomb","Amerigo Vespucci","Vasco de Gama","Magellan"],ans:0,exp:"Christophe Colomb a atteint l'Amérique le 12 octobre 1492.",hint:"Il cherchait une route vers les Indes."},
+      {q:"Quelle révolution a renversé la monarchie française en 1789 ?",opts:["La Révolution française","La Révolution industrielle","La Fronde","La Révolution américaine"],ans:0,exp:"La Révolution française a renversé Louis XVI et instauré la République.",hint:"Elle a donné naissance à la devise Liberté, Égalité, Fraternité."},
+      {q:"Quel général corse est devenu Empereur de France ?",opts:["Napoléon Bonaparte","Wellington","Joséphine","Murat"],ans:0,exp:"Napoléon Bonaparte est devenu Empereur des Français en 1804.",hint:"Il est né à Ajaccio en 1769."},
+      {q:"Quel empire était gouverné par Jules César ?",opts:["Romain","Grec","Perse","Égyptien"],ans:0,exp:"Jules César était général et dictateur de la République romaine.",hint:"Sa devise était 'Veni, vidi, vici'."},
+    ],
+    moyen:[
+      {q:"Quel traité a mis fin à la Première Guerre Mondiale ?",opts:["Traité de Versailles","Traité de Paris","Traité de Vienne","Armistice de Rethondes"],ans:0,exp:"Le Traité de Versailles (28 juin 1919) a officiellement mis fin à la WWI.",hint:"Il a été signé dans le célèbre château royal français."},
+      {q:"En quelle année a été fondée la République Populaire de Chine ?",opts:["1949","1945","1912","1960"],ans:0,exp:"Mao Zedong a proclamé la RPC le 1er octobre 1949.",hint:"C'est après la Seconde Guerre Mondiale."},
+      {q:"Quel pays a été le premier à accorder le droit de vote aux femmes ?",opts:["Nouvelle-Zélande","Australie","Finlande","France"],ans:0,exp:"La Nouvelle-Zélande a accordé le droit de vote aux femmes en 1893.",hint:"C'est un pays de l'hémisphère sud."},
+      {q:"Quel mouvement politique a pris le pouvoir en Russie en 1917 ?",opts:["Bolcheviques","Mencheviques","Cadets","Tsaristes"],ans:0,exp:"Les Bolcheviques de Lénine ont pris le pouvoir lors de la Révolution d'Octobre 1917.",hint:"Lénine était leur chef."},
+      {q:"Quel pharaon est associé à la construction de la grande pyramide de Gizeh ?",opts:["Kheops","Ramsès II","Toutankhamon","Cléopâtre"],ans:0,exp:"La grande pyramide a été construite sous le règne de Kheops vers 2560 av. J.-C.",hint:"Son nom ressemble à 'Cheops' en grec."},
+      {q:"En quelle année Magellan a-t-il entamé le premier tour du monde ?",opts:["1519","1492","1498","1510"],ans:0,exp:"L'expédition de Magellan a débuté en 1519.",hint:"Il est mort en 1521 aux Philippines."},
+      {q:"Quelle guerre civile américaine s'est déroulée de 1861 à 1865 ?",opts:["La Guerre de Sécession","La Révolution américaine","La Guerre de 1812","La Guerre mexicaine"],ans:0,exp:"La Guerre de Sécession a opposé les États du Nord aux États du Sud.",hint:"Elle a abouti à l'abolition de l'esclavage."},
+      {q:"Qui a dirigé l'Allemagne nazie pendant la Seconde Guerre Mondiale ?",opts:["Adolf Hitler","Hermann Göring","Heinrich Himmler","Joseph Goebbels"],ans:0,exp:"Adolf Hitler a dirigé l'Allemagne de 1933 jusqu'à sa mort en 1945.",hint:"Il était le Führer du III. Reich."},
+      {q:"Quel traité a mis fin aux guerres de Religion en France en 1598 ?",opts:["Édit de Nantes","Paix de Westphalie","Traité de Cateau-Cambrésis","Paix d'Augsbourg"],ans:0,exp:"L'Édit de Nantes (1598) signé par Henri IV garantissait la liberté de culte aux protestants.",hint:"Il a été signé par Henri IV."},
+      {q:"Quelle empire était au sommet sous Soliman le Magnifique ?",opts:["Ottoman","Perse","Mongol","Habsburg"],ans:0,exp:"L'Empire ottoman a atteint son apogée sous Soliman le Magnifique (1520-1566).",hint:"Sa capitale était Constantinople."},
+    ],
+    difficile:[
+      {q:"Quel événement a précipité l'entrée des USA dans la Première Guerre Mondiale ?",opts:["Le Télégramme Zimmermann","Le naufrage du Lusitania","L'invasion de la Belgique","La Révolution russe"],ans:0,exp:"Le Télégramme Zimmermann (1917) proposait au Mexique une alliance contre les USA.",hint:"C'était un document diplomatique secret intercepté."},
+      {q:"Quel empire contrôlait l'Inde avant les Britanniques, fondé par Babur en 1526 ?",opts:["Empire moghol","Empire perse","Empire timouride","Sultanat de Delhi"],ans:0,exp:"L'Empire moghol, fondé par Babur en 1526, domina l'Inde jusqu'au XIXe siècle.",hint:"Le Taj Mahal a été construit sous cet empire."},
+      {q:"Quelle philosophie politique est associée à Thomas Hobbes ?",opts:["Absolutisme","Libéralisme","Anarchisme","Socialisme"],ans:0,exp:"Hobbes défendait l'absolutisme monarchique dans son œuvre 'Le Léviathan'.",hint:"Il croyait que l'homme est naturellement mauvais."},
+      {q:"En quel siècle a eu lieu la Guerre des Cent Ans entre France et Angleterre ?",opts:["XIVe-XVe siècles","XIIe-XIIIe siècles","XVIe-XVIIe siècles","XIIIe-XIVe siècles"],ans:0,exp:"La Guerre de Cent Ans a duré de 1337 à 1453, avec Jeanne d'Arc comme figure emblématique.",hint:"Elle impliquait Jeanne d'Arc."},
+      {q:"Quel accord a établi les frontières européennes après les guerres napoléoniennes ?",opts:["Congrès de Vienne","Traité de Westphalie","Traité de Versailles","Traité de Paris"],ans:0,exp:"Le Congrès de Vienne (1814-1815) a redessiné la carte de l'Europe post-napoléonienne.",hint:"Il s'est tenu dans la capitale autrichienne."},
+      {q:"Quel est le nom de la loi romaine qui gouvernait les non-citoyens ?",opts:["Jus Gentium","Jus Civile","Jus Naturale","Lex Romana"],ans:0,exp:"Le Jus Gentium ('droit des gens') s'appliquait aux peuples non-romains dans l'Empire.",hint:"Sa traduction signifie 'droit des gens' ou 'droit des nations'."},
+      {q:"Quelle bataille de 1242 vit Alexandre Nevski défaire les chevaliers Teutoniques ?",opts:["Bataille du lac Peïpous","Bataille de la Neva","Bataille de Bouvines","Bataille de Marchfeld"],ans:0,exp:"La Bataille du lac Peïpous (1242) fut une victoire novgorodienne décisive.",hint:"Elle s'est déroulée sur la glace d'un lac."},
+      {q:"Quelle religion a été fondée par Zoroastre (Zarathoustra) ?",opts:["Zoroastrisme","Manichéisme","Mithriacisme","Bouddhisme"],ans:0,exp:"Le Zoroastrisme, fondé par Zoroastre (~1500-1000 av. J.-C.), est l'une des premières religions monothéistes.",hint:"Son nom est dérivé de celui de son fondateur."},
+      {q:"Quel pharaon a tenté d'instaurer le monothéisme en Égypte ancienne ?",opts:["Akhenaton","Ramsès II","Toutankhamon","Amenhotep II"],ans:0,exp:"Akhenaton a imposé le culte d'Aton, tentant un monothéisme révolutionnaire.",hint:"Il a changé la capitale à Amarna."},
+      {q:"Quelle théorie stipule que les conditions matérielles déterminent l'histoire ?",opts:["Matérialisme historique","Positivisme","Idéalisme hégélien","Structuralisme"],ans:0,exp:"Le matérialisme historique (Marx & Engels) postule que l'infrastructure économique détermine la superstructure sociale.",hint:"Il est associé à Marx et Engels."},
+    ]
+  },
+  geo:{
+    facile:[
+      {q:"Quelle est la capitale de la France ?",opts:["Paris","Lyon","Marseille","Bordeaux"],ans:0,exp:"Paris est la capitale et la plus grande ville de France.",hint:"C'est la ville de la Tour Eiffel."},
+      {q:"Quel est le plus grand océan du monde ?",opts:["Pacifique","Atlantique","Indien","Arctique"],ans:0,exp:"L'océan Pacifique couvre environ 165 millions de km².",hint:"Il borde à la fois l'Asie et les Amériques."},
+      {q:"Sur quel continent se trouve le Sahara ?",opts:["Afrique","Asie","Australie","Amérique du Sud"],ans:0,exp:"Le Sahara est le plus grand désert chaud du monde et couvre une grande partie de l'Afrique du Nord.",hint:"Il est entouré par la mer Méditerranée au nord."},
+      {q:"Quelle est la plus haute montagne du monde ?",opts:["Everest","K2","Kanchenjunga","Lhotse"],ans:0,exp:"Le mont Everest (8 849 m) est le sommet le plus haut au-dessus du niveau de la mer.",hint:"Il se trouve dans l'Himalaya."},
+      {q:"Quel est le plus long fleuve du monde ?",opts:["Nil","Amazone","Yang-Tsé","Mississippi"],ans:0,exp:"Le Nil (6 650 km) est généralement considéré comme le plus long fleuve.",hint:"Il traverse l'Égypte et se jette dans la Méditerranée."},
+      {q:"Quelle est la capitale du Japon ?",opts:["Tokyo","Osaka","Kyoto","Hiroshima"],ans:0,exp:"Tokyo est la capitale du Japon et l'une des villes les plus peuplées du monde.",hint:"Son nom signifie 'capitale de l'Est'."},
+      {q:"Combien de continents y a-t-il sur Terre ?",opts:["7","5","6","8"],ans:0,exp:"Les 7 continents sont: Afrique, Antarctique, Asie, Australie, Europe, Amérique du Nord, Amérique du Sud.",hint:"Le plus froid est l'un d'entre eux."},
+      {q:"Quel pays est le plus grand du monde par superficie ?",opts:["Russie","Canada","Chine","États-Unis"],ans:0,exp:"La Russie couvre 17,1 millions de km², soit environ 11% des terres émergées mondiales.",hint:"Il s'étend sur deux continents."},
+      {q:"Quelle est la capitale du Brésil ?",opts:["Brasília","São Paulo","Rio de Janeiro","Salvador"],ans:0,exp:"Brasília est la capitale fédérale du Brésil depuis 1960.",hint:"Son nom contient le nom du pays."},
+      {q:"Quelle mer sépare l'Europe de l'Afrique au niveau de Gibraltar ?",opts:["Méditerranée","Rouge","Noire","Caspienne"],ans:0,exp:"La mer Méditerranée est séparée de l'Atlantique par le détroit de Gibraltar.",hint:"Elle baigne l'Italie, la Grèce et l'Espagne."},
+    ],
+    moyen:[
+      {q:"Quel pays possède le plus grand nombre d'îles au monde ?",opts:["Suède","Finlande","Norvège","Indonésie"],ans:0,exp:"La Suède possède environ 221 800 îles.",hint:"Ce pays est en Scandinavie."},
+      {q:"Quel détroit sépare l'Asie de l'Amérique du Nord ?",opts:["Détroit de Béring","Détroit de Magellan","Détroit d'Hudson","Canal de Panama"],ans:0,exp:"Le détroit de Béring (88 km) sépare la Russie de l'Alaska.",hint:"Il porte le nom d'un explorateur danois."},
+      {q:"Quel désert est le plus froid du monde ?",opts:["Antarctique","Arctique","Gobi","Atacama"],ans:0,exp:"L'Antarctique est le plus grand et le plus froid désert du monde.",hint:"Il est situé au pôle Sud."},
+      {q:"Quel est le pays le plus densément peuplé du monde ?",opts:["Monaco","Bangladesh","Singapour","Vatican"],ans:0,exp:"Monaco est l'État le plus densément peuplé avec environ 26 000 habitants/km².",hint:"C'est une principauté sur la Côte d'Azur."},
+      {q:"Dans quel pays se trouve le lac Titicaca ?",opts:["Pérou et Bolivie","Chili","Argentine","Équateur"],ans:0,exp:"Le lac Titicaca est partagé entre le Pérou et la Bolivie à 3 812 m d'altitude.",hint:"Il est partagé entre deux pays."},
+      {q:"Quel fleuve traverse Paris ?",opts:["Seine","Loire","Rhône","Garonne"],ans:0,exp:"La Seine traverse Paris sur environ 13 km.",hint:"La Tour Eiffel est construite sur ses berges."},
+      {q:"Quelle est la capitale de l'Australie ?",opts:["Canberra","Sydney","Melbourne","Brisbane"],ans:0,exp:"Canberra est la capitale fédérale de l'Australie depuis 1927.",hint:"Ce n'est ni Sydney ni Melbourne, bien que ce soient les plus grandes villes."},
+      {q:"Quel pays est surnommé 'le pays du soleil levant' ?",opts:["Japon","Corée du Sud","Chine","Thaïlande"],ans:0,exp:"Le Japon est surnommé 'pays du soleil levant' (Nihon).",hint:"Son drapeau représente un soleil rouge."},
+      {q:"Quelle chaîne de montagnes sépare l'Europe de l'Asie ?",opts:["Oural","Alpes","Caucase","Himalaya"],ans:0,exp:"Les monts Oural (2 500 km) constituent la frontière naturelle traditionnelle entre Europe et Asie.",hint:"Cette chaîne se trouve en Russie."},
+      {q:"Quelle ville est connue comme 'la Venise de l'Est' ?",opts:["Suzhou","Bangkok","Bruges","Amsterdam"],ans:0,exp:"Suzhou (Chine) est surnommée 'la Venise de l'Orient'.",hint:"Cette ville est en Chine."},
+    ],
+    difficile:[
+      {q:"Quel pays possède le plus de frontières terrestres ?",opts:["Chine","Russie","Brésil","Allemagne"],ans:0,exp:"La Chine et la Russie sont à égalité avec 14 pays voisins chacun.",hint:"Ce pays partage une frontière avec l'Inde et la Russie."},
+      {q:"Quelle est la ville la plus au nord avec une population significative ?",opts:["Longyearbyen","Tromsø","Murmansk","Barrow"],ans:0,exp:"Longyearbyen (Svalbard, Norvège) est la plus septentrionale avec environ 2 500 habitants.",hint:"Elle se trouve sur l'archipel Svalbard."},
+      {q:"Quel fleuve a le plus grand débit d'eau ?",opts:["Amazone","Nil","Congo","Mississippi"],ans:0,exp:"L'Amazone représente 20% des eaux douces mondiales.",hint:"Il traverse le Brésil."},
+      {q:"Qu'est-ce que la ligne de changement de date internationale ?",opts:["Méridien 180°","Méridien de Greenwich","Tropique du Capricorne","Cercle polaire"],ans:0,exp:"La ligne de changement de date suit approximativement le méridien 180° dans l'océan Pacifique.",hint:"Elle est à l'opposé du méridien de Greenwich."},
+      {q:"Quel pays a la forme géographique la plus proche d'un hexagone ?",opts:["France","Belgique","Pologne","Hongrie"],ans:0,exp:"La France est souvent appelée 'l'Hexagone'.",hint:"Ce pays est surnommé 'l'Hexagone'."},
+      {q:"Quel est le point le plus profond des océans ?",opts:["Fosse des Mariannes","Fosse de Tonga","Fosse de Kermadec","Fosse de Puerto Rico"],ans:0,exp:"La fosse des Mariannes dans le Pacifique atteint 11 034 m de profondeur.",hint:"Elle est nommée d'après des îles du Pacifique."},
+      {q:"Quel pays est entièrement enclavé dans un autre pays ?",opts:["Lesotho","Vatican","Saint-Marin","Monaco"],ans:0,exp:"Le Lesotho est entièrement entouré par l'Afrique du Sud.",hint:"Ce pays est en Afrique australe."},
+      {q:"Quelle est la mer la plus salée du monde ?",opts:["Mer Morte","Mer d'Aral","Mer Rouge","Mer Caspienne"],ans:0,exp:"La mer Morte a une salinité d'environ 34%, soit 10 fois plus que l'océan.",hint:"On ne peut pas s'y noyer, on y flotte."},
+      {q:"Quel pays d'Afrique subsaharienne a la plus grande économie ?",opts:["Nigeria","Afrique du Sud","Kenya","Éthiopie"],ans:0,exp:"Le Nigeria est la plus grande économie d'Afrique subsaharienne.",hint:"C'est aussi le pays le plus peuplé d'Afrique."},
+      {q:"Combien d'États américains sont adjacents à l'océan Pacifique ?",opts:["5","3","4","6"],ans:0,exp:"5 États : Californie, Oregon, Washington, Alaska et Hawaii ont un accès direct au Pacifique.",hint:"Hawaii en fait partie."},
+    ]
+  },
+  tech:{
+    facile:[
+      {q:"Que signifie l'acronyme 'CPU' ?",opts:["Central Processing Unit","Computer Power Unit","Control Processing Unit","Central Program Unit"],ans:0,exp:"CPU signifie 'Central Processing Unit', le cerveau de l'ordinateur.",hint:"C'est le 'cerveau' de l'ordinateur."},
+      {q:"Quel langage est principalement utilisé pour le web frontend ?",opts:["JavaScript","Python","Java","C++"],ans:0,exp:"JavaScript est le langage principal du web côté client.",hint:"Son nom contient le nom d'une boisson chaude."},
+      {q:"Que signifie 'HTML' ?",opts:["HyperText Markup Language","High Tech Modern Language","HyperText Modern Layout","High Transfer Markup Language"],ans:0,exp:"HTML (HyperText Markup Language) est le langage standard pour créer des pages web.",hint:"C'est un langage de balisage, pas de programmation."},
+      {q:"Qu'est-ce qu'un algorithme ?",opts:["Suite d'instructions","Type d'ordinateur","Langage de programmation","Système d'exploitation"],ans:0,exp:"Un algorithme est une suite finie d'instructions permettant de résoudre un problème.",hint:"Une recette de cuisine en est un exemple."},
+      {q:"Quelle entreprise a créé le système d'exploitation Android ?",opts:["Google","Apple","Microsoft","Samsung"],ans:0,exp:"Android a été développé par Android Inc., rachetée par Google en 2005.",hint:"Ce géant du web possède aussi YouTube."},
+      {q:"Que signifie 'RAM' ?",opts:["Random Access Memory","Read Access Memory","Rapid Application Module","Runtime Access Mode"],ans:0,exp:"RAM (Random Access Memory) est la mémoire vive.",hint:"C'est la mémoire à court terme de votre ordinateur."},
+      {q:"Quel protocole sécurise les communications web avec HTTPS ?",opts:["TLS/SSL","HTTP","FTP","TCP"],ans:0,exp:"HTTPS utilise TLS (Transport Layer Security) pour chiffrer les communications.",hint:"Le 'S' de HTTPS signifie 'Secure'."},
+      {q:"Qu'est-ce que l'Internet des Objets (IoT) ?",opts:["Appareils connectés à Internet","Réseau privé","Type de virus","Cloud computing"],ans:0,exp:"L'IoT désigne tous les objets physiques connectés à Internet.",hint:"Votre réfrigérateur connecté en est un exemple."},
+      {q:"Quelle est la fonction principale d'un pare-feu (firewall) ?",opts:["Filtrer le trafic réseau","Accélérer Internet","Stocker des données","Gérer les emails"],ans:0,exp:"Un firewall analyse et filtre le trafic réseau entrant et sortant.",hint:"Son nom en anglais évoque une protection contre le feu."},
+      {q:"Que signifie 'URL' ?",opts:["Uniform Resource Locator","Universal Remote Link","Unified Request Language","User Reference Library"],ans:0,exp:"URL (Uniform Resource Locator) est l'adresse web d'une ressource sur Internet.",hint:"C'est ce que vous tapez dans la barre d'adresse du navigateur."},
+    ],
+    moyen:[
+      {q:"Qu'est-ce que la complexité algorithmique O(n) signifie ?",opts:["Temps linéaire","Temps constant","Temps quadratique","Temps logarithmique"],ans:0,exp:"O(n) indique que le temps d'exécution croît linéairement avec la taille des données.",hint:"Doublez l'entrée, doublez le temps d'exécution."},
+      {q:"Que fait la commande 'git commit' ?",opts:["Sauvegarde les changements localement","Envoie au serveur distant","Crée une branche","Fusionne les branches"],ans:0,exp:"git commit enregistre un instantané des modifications dans le dépôt local.",hint:"C'est une sauvegarde locale de vos modifications."},
+      {q:"Qu'est-ce qu'une API REST ?",opts:["Interface de communication HTTP","Base de données","Langage de programmation","Système d'exploitation"],ans:0,exp:"REST est un style architectural utilisant HTTP pour les APIs web.",hint:"Elle utilise les verbes HTTP (GET, POST, PUT, DELETE)."},
+      {q:"Que signifie 'SQL' ?",opts:["Structured Query Language","System Query Logic","Sequential Query List","Server Query Layer"],ans:0,exp:"SQL (Structured Query Language) est le langage standard pour gérer les bases de données.",hint:"On l'utilise pour interroger des bases de données."},
+      {q:"Qu'est-ce que la récursivité en programmation ?",opts:["Fonction qui s'appelle elle-même","Boucle infinie","Type de variable","Héritage de classe"],ans:0,exp:"La récursivité est une technique où une fonction se rappelle elle-même.",hint:"Les poupées russes en sont une métaphore."},
+      {q:"Quel type de base de données est MongoDB ?",opts:["NoSQL","SQL","Relationnelle","Graphe"],ans:0,exp:"MongoDB est une base de données NoSQL orientée documents.",hint:"Son nom contient le mot 'humongous' (énorme)."},
+      {q:"Que représente l'adresse IP 127.0.0.1 ?",opts:["Localhost","Google DNS","Serveur local","Broadcast"],ans:0,exp:"127.0.0.1 est l'adresse de loopback, pointant vers la machine locale.",hint:"Elle pointe vers votre propre machine."},
+      {q:"Qu'est-ce que le machine learning supervisé ?",opts:["Apprentissage avec données étiquetées","Apprentissage sans labels","Apprentissage par renforcement","Deep learning"],ans:0,exp:"L'apprentissage supervisé utilise des données d'entraînement étiquetées.",hint:"Le modèle apprend à partir d'exemples avec réponses connues."},
+      {q:"Qu'est-ce qu'un conteneur Docker ?",opts:["Environnement d'exécution isolé","Type de serveur","Framework web","Base de données"],ans:0,exp:"Un conteneur Docker encapsule une application et ses dépendances dans un environnement isolé.",hint:"Son logo est une baleine portant des conteneurs."},
+      {q:"Quel paradigme de programmation Python supporte principalement ?",opts:["Multi-paradigme","Purement orienté objet","Purement fonctionnel","Procédural uniquement"],ans:0,exp:"Python est multi-paradigme : il supporte OOP, fonctionnel et procédural.",hint:"Python est flexible sur le style de programmation."},
+    ],
+    difficile:[
+      {q:"Quel algorithme de tri a une complexité moyenne de O(n log n) ?",opts:["Quicksort","Bubble sort","Insertion sort","Selection sort"],ans:0,exp:"Quicksort a une complexité moyenne O(n log n).",hint:"Son nom suggère sa rapidité."},
+      {q:"Qu'est-ce que le théorème CAP en systèmes distribués ?",opts:["Consistency, Availability, Partition","Cache, API, Performance","Concurrency, Atomicity, Persistence","Control, Access, Protocol"],ans:0,exp:"Le théorème CAP stipule qu'un système distribué ne peut garantir que 2 des 3 propriétés simultanément.",hint:"Les 3 lettres sont des initiales de mots anglais."},
+      {q:"Qu'est-ce que le polymorphisme en POO ?",opts:["Un objet peut prendre plusieurs formes","Héritage multiple","Encapsulation des données","Abstraction d'interface"],ans:0,exp:"Le polymorphisme permet à des objets de différentes classes d'être traités via une interface commune.",hint:"Poly signifie 'plusieurs' en grec."},
+      {q:"Que signifie SOLID en ingénierie logicielle ?",opts:["5 principes de conception OOP","Framework JavaScript","Architecture microservices","Méthode agile"],ans:0,exp:"SOLID = Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion.",hint:"Chaque lettre représente un principe de conception."},
+      {q:"Qu'est-ce qu'une race condition en programmation concurrente ?",opts:["Bug dépendant de l'ordre d'exécution","Erreur de compilation","Débordement de mémoire","Deadlock"],ans:0,exp:"Une race condition survient quand le résultat dépend de l'ordre imprévisible d'exécution de threads concurrents.",hint:"C'est un bug difficile à reproduire."},
+      {q:"Quel problème résout le pattern Observer ?",opts:["Notification de changements d'état","Gestion de la mémoire","Optimisation des requêtes","Sécurité des données"],ans:0,exp:"L'Observer pattern notifie automatiquement les dépendants quand un objet change d'état.",hint:"Pensez à un système d'abonnement."},
+      {q:"Qu'est-ce que le garbage collection (GC) ?",opts:["Libération automatique de mémoire","Nettoyage des logs","Suppression de fichiers","Optimisation CPU"],ans:0,exp:"Le GC identifie et libère la mémoire non utilisée par le programme.",hint:"C'est un mécanisme automatique de gestion mémoire."},
+      {q:"Qu'est-ce qu'un deadlock en systèmes d'exploitation ?",opts:["Blocage mutuel de processus","Crash système","Débordement de pile","Fuite mémoire"],ans:0,exp:"Un deadlock est une situation où 2+ processus attendent indéfiniment une ressource détenue par l'autre.",hint:"Imaginez deux voitures bloquées dans une impasse face à face."},
+      {q:"Quelle structure de données offre une recherche en O(1) en moyenne ?",opts:["Table de hachage","Tableau","Liste chaînée","Arbre binaire"],ans:0,exp:"Une hash table offre des opérations de recherche en O(1) en moyenne.",hint:"Elle utilise une fonction de hachage."},
+      {q:"Qu'est-ce que le protocole TCP/IP ?",opts:["Suite de protocoles réseau","Langage web","Système de fichiers","Protocole de sécurité"],ans:0,exp:"TCP/IP est la suite de protocoles fondamentale d'Internet.",hint:"Deux protocoles en un : l'un contrôle la transmission, l'autre l'adressage."},
+    ]
+  },
+  culture:{
+    facile:[
+      {q:"Qui a écrit 'Les Misérables' ?",opts:["Victor Hugo","Gustave Flaubert","Honoré de Balzac","Émile Zola"],ans:0,exp:"Les Misérables (1862) est le chef-d'œuvre de Victor Hugo.",hint:"Il a aussi écrit Notre-Dame de Paris."},
+      {q:"Quel artiste a peint 'La Nuit étoilée' ?",opts:["Van Gogh","Picasso","Monet","Rembrandt"],ans:0,exp:"La Nuit étoilée (1889) a été peinte par Vincent van Gogh à Saint-Rémy-de-Provence.",hint:"Ce peintre hollandais s'est coupé l'oreille."},
+      {q:"Qui a composé la 5ème Symphonie en ut mineur ?",opts:["Beethoven","Mozart","Bach","Chopin"],ans:0,exp:"La 5ème Symphonie de Beethoven (1808) est connue pour son motif de 4 notes.",hint:"Ce compositeur était sourd quand il l'a composée."},
+      {q:"Quel personnage Sherlock Holmes a-t-il comme ami fidèle ?",opts:["Dr Watson","Inspector Lestrade","Mycroft Holmes","Mrs Hudson"],ans:0,exp:"Dr John H. Watson est le fidèle compagnon de Sherlock Holmes.",hint:"Il est médecin de profession."},
+      {q:"Dans quelle ville se déroule 'Roméo et Juliette' de Shakespeare ?",opts:["Vérone","Florence","Rome","Venise"],ans:0,exp:"Roméo et Juliette se déroule à Vérone, en Italie.",hint:"Cette ville est en Italie du Nord."},
+      {q:"Quel mouvement artistique Monet représente-t-il ?",opts:["Impressionnisme","Cubisme","Surréalisme","Réalisme"],ans:0,exp:"Claude Monet est le chef de file de l'Impressionnisme.",hint:"Ce mouvement est né en France dans les années 1870."},
+      {q:"Qui a écrit 'Le Petit Prince' ?",opts:["Antoine de Saint-Exupéry","Jules Verne","Albert Camus","Marcel Proust"],ans:0,exp:"Le Petit Prince (1943) est l'œuvre la plus célèbre d'Antoine de Saint-Exupéry.",hint:"Son auteur était aviateur."},
+      {q:"Quel opéra contient l'aria 'Nessun Dorma' ?",opts:["Turandot","Aida","La Traviata","Rigoletto"],ans:0,exp:"Nessun Dorma est le célèbre air de Calaf dans Turandot de Puccini.",hint:"Cet opéra est de Puccini."},
+      {q:"Quel est le roman de Kafka sur un homme transformé en insecte ?",opts:["La Métamorphose","Le Procès","Le Château","Amerika"],ans:0,exp:"La Métamorphose (1915) de Kafka raconte Gregor Samsa transformé en insecte.",hint:"Le titre du roman décrit aussi ce qui arrive au personnage principal."},
+      {q:"Quel poète romantique anglais a écrit 'Ode à un rossignol' ?",opts:["John Keats","Percy Shelley","Lord Byron","William Blake"],ans:0,exp:"Ode à un rossignol (1819) est l'un des grands poèmes de John Keats.",hint:"Ce poète est mort à 25 ans de la tuberculose."},
+    ],
+    moyen:[
+      {q:"Quel mouvement a été fondé par André Breton dans les années 1920 ?",opts:["Surréalisme","Dadaïsme","Futurisme","Expressionnisme"],ans:0,exp:"André Breton a fondé le Surréalisme et publié son Manifeste en 1924.",hint:"Salvador Dalí en est le représentant le plus célèbre."},
+      {q:"Quel compositeur était sourd quand il a composé sa 9ème Symphonie ?",opts:["Beethoven","Bach","Mozart","Haydn"],ans:0,exp:"Beethoven était pratiquement sourd lorsqu'il a composé la 9ème Symphonie (1824).",hint:"L'Ode à la Joie en fait partie."},
+      {q:"Quel auteur a créé le personnage Don Quichotte ?",opts:["Miguel de Cervantes","Lope de Vega","Francisco de Quevedo","Calderón"],ans:0,exp:"Miguel de Cervantes a écrit Don Quichotte (1605-1615).",hint:"C'est considéré comme le premier roman moderne."},
+      {q:"Dans quelle ville est né le jazz ?",opts:["La Nouvelle-Orléans","New York","Chicago","Memphis"],ans:0,exp:"Le jazz est né à La Nouvelle-Orléans vers 1900.",hint:"Cette ville est dans l'état de Louisiane."},
+      {q:"Quel peintre espagnol est connu pour son style cubiste ?",opts:["Pablo Picasso","Salvador Dalí","Joan Miró","Francisco Goya"],ans:0,exp:"Pablo Picasso est le co-fondateur du Cubisme avec Georges Braque.",hint:"Il est né à Málaga en 1881."},
+      {q:"Qui a écrit 'L'Étranger' ?",opts:["Albert Camus","Jean-Paul Sartre","Simone de Beauvoir","André Gide"],ans:0,exp:"L'Étranger (1942) est l'œuvre phare d'Albert Camus.",hint:"Cet auteur a reçu le Prix Nobel de Littérature en 1957."},
+      {q:"Quel genre musical a émergé de la Jamaïque dans les années 1960 ?",opts:["Reggae","Ska","Rocksteady","Dancehall"],ans:0,exp:"Le reggae, popularisé par Bob Marley, est né en Jamaïque à la fin des années 1960.",hint:"Bob Marley en est l'ambassadeur le plus célèbre."},
+      {q:"Qui est l'auteur de '1984' ?",opts:["George Orwell","Aldous Huxley","Ray Bradbury","H.G. Wells"],ans:0,exp:"1984 (1949) est le roman dystopique de George Orwell décrivant Big Brother.",hint:"Son vrai nom était Eric Arthur Blair."},
+      {q:"Quelle technique utilisait Rembrandt pour les contrastes lumière/ombre ?",opts:["Clair-obscur","Sfumato","Pointillisme","Impasto"],ans:0,exp:"Rembrandt maîtrisait le clair-obscur (chiaroscuro).",hint:"Le nom de cette technique est aussi utilisé en français."},
+      {q:"Qui a composé 'Le Lac des Cygnes' ?",opts:["Tchaïkovski","Stravinsky","Prokofiev","Rachmaninov"],ans:0,exp:"Le Lac des Cygnes (1875-1876) est un ballet de Piotr Ilitch Tchaïkovski.",hint:"Ce compositeur russe a aussi écrit Casse-Noisette."},
+    ],
+    difficile:[
+      {q:"Quel style architectural a été développé par Antoni Gaudí ?",opts:["Art nouveau catalan","Gothique tardif","Modernisme baroque","Neo-byzantin"],ans:0,exp:"Gaudí a développé un style unique, synthèse de l'Art nouveau et de formes organiques.",hint:"La Sagrada Família à Barcelone est son œuvre principale."},
+      {q:"Quel roman de Proust décrit la mémoire involontaire ?",opts:["À la recherche du temps perdu","Jean Santeuil","Les Plaisirs et les jours","Contre Sainte-Beuve"],ans:0,exp:"À la recherche du temps perdu (1913-1927) explore la mémoire à travers la madeleine trempée.",hint:"C'est l'un des romans les plus longs jamais écrits."},
+      {q:"Quelle école artistique allemande a révolutionné le design au XXe siècle ?",opts:["Bauhaus","Wiener Werkstätte","De Stijl","Arts and Crafts"],ans:0,exp:"Le Bauhaus (1919-1933), fondé par Walter Gropius, a révolutionné l'art et le design.",hint:"Son nom signifie 'maison de construction' en allemand."},
+      {q:"Qui a peint 'Le Cri' (Skrik) ?",opts:["Edvard Munch","Egon Schiele","Gustav Klimt","Oskar Kokoschka"],ans:0,exp:"Le Cri (1893) est l'œuvre emblématique de l'expressionnisme.",hint:"Ce peintre est norvégien."},
+      {q:"Quel est le terme musical pour une composition à plusieurs voix indépendantes ?",opts:["Polyphonie","Homophonie","Monophonie","Hétérophonie"],ans:0,exp:"La polyphonie désigne une texture musicale où plusieurs voix jouent des lignes mélodiques indépendantes.",hint:"Le préfixe 'poly' signifie 'plusieurs' en grec."},
+      {q:"Qui a théorisé le concept d'hégémonie culturelle ?",opts:["Antonio Gramsci","Louis Althusser","Michel Foucault","Pierre Bourdieu"],ans:0,exp:"Antonio Gramsci a développé le concept d'hégémonie culturelle dans ses Cahiers de prison.",hint:"Il était un intellectuel marxiste italien emprisonné par Mussolini."},
+      {q:"Quel est le terme désignant l'art de la calligraphie en Extrême-Orient ?",opts:["Shodō","Ikebana","Sumi-e","Ukiyo-e"],ans:0,exp:"Le shodō (書道) est l'art de la calligraphie japonaise.",hint:"Ce terme est japonais."},
+      {q:"Quel compositeur a écrit 'Le Sacre du Printemps' (1913) ?",opts:["Igor Stravinsky","Claude Debussy","Sergei Prokofiev","Béla Bartók"],ans:0,exp:"Le Sacre du Printemps (1913) d'Igor Stravinsky a provoqué un scandale retentissant à sa création.",hint:"Ce compositeur est russo-américain."},
+      {q:"Quel écrivain argentin a influencé le 'réalisme magique' en littérature ?",opts:["Jorge Luis Borges","Gabriel García Márquez","Isabel Allende","Julio Cortázar"],ans:0,exp:"Borges a influencé le réalisme magique, García Márquez en est le représentant majeur.",hint:"Il est célèbre pour ses labyrinthes et bibliothèques infinies."},
+      {q:"Quel est le principe de la 'défamiliarisation' dans la théorie littéraire ?",opts:["Rendre l'ordinaire étrange","Narration à la première personne","Structure en cadre","Flux de conscience"],ans:0,exp:"L'ostranienie (Viktor Chklovski, 1917) est la technique de présenter les choses de manière inhabituelle.",hint:"Ce concept vient du Formalisme russe."},
+    ]
+  },
+  sport:{
+    facile:[
+      {q:"Combien de joueurs compte une équipe de football ?",opts:["11","10","12","9"],ans:0,exp:"Une équipe de football compte 11 joueurs sur le terrain.",hint:"Le numéro du gardien est souvent le 1, le dernier est le 11."},
+      {q:"Quel pays a remporté le plus de Coupes du Monde de football ?",opts:["Brésil","Allemagne","Italie","Argentine"],ans:0,exp:"Le Brésil a remporté 5 Coupes du Monde, un record.",hint:"Ce pays d'Amérique du Sud est réputé pour le samba."},
+      {q:"Quel sport se joue avec un volant (shuttlecock) ?",opts:["Badminton","Tennis","Squash","Padel"],ans:0,exp:"Le badminton utilise un volant frappé au-dessus d'un filet.",hint:"On peut jouer en simple ou en double."},
+      {q:"Combien de points vaut un essai au rugby à XV ?",opts:["5","4","3","6"],ans:0,exp:"Un essai vaut 5 points au rugby à XV.",hint:"Il y a aussi la possibilité d'une transformation à 2 points."},
+      {q:"Quel sport pratique Roger Federer ?",opts:["Tennis","Squash","Badminton","Padel"],ans:0,exp:"Roger Federer est l'un des plus grands joueurs de tennis de l'histoire.",hint:"Il a remporté 20 titres du Grand Chelem."},
+      {q:"Quelle est la distance d'un marathon ?",opts:["42,195 km","40 km","45 km","38 km"],ans:0,exp:"Le marathon mesure exactement 42,195 km.",hint:"La distance est proche de 42 kilomètres."},
+      {q:"Dans quel sport utilise-t-on un 'birdie' et un 'eagle' ?",opts:["Golf","Tennis","Baseball","Badminton"],ans:0,exp:"Au golf, un birdie = -1 coup par rapport au par, un eagle = -2 coups.",hint:"Ce sport se joue sur un green."},
+      {q:"Combien de joueurs par équipe au basketball ?",opts:["5","6","4","7"],ans:0,exp:"Une équipe de basketball aligne 5 joueurs sur le terrain.",hint:"Pensez aux doigts d'une main."},
+      {q:"Aux JO, quelle couleur représente l'Afrique ?",opts:["Vert","Jaune","Rouge","Bleu"],ans:0,exp:"Le vert représente l'Afrique dans les 5 anneaux olympiques.",hint:"C'est la couleur des végétaux, associée au continent."},
+      {q:"Combien de sets pour gagner en Grand Chelem (hommes) ?",opts:["3","2","4","5"],ans:0,exp:"En Grand Chelem masculin, il faut gagner 3 sets sur 5.",hint:"Il faut la majorité des sets sur 5 possibles."},
+    ],
+    moyen:[
+      {q:"Quel nageur détient le record du plus grand nombre de médailles olympiques ?",opts:["Michael Phelps","Mark Spitz","Ian Thorpe","Ryan Lochte"],ans:0,exp:"Michael Phelps détient 28 médailles olympiques, un record absolu.",hint:"Ce nageur américain a dominé les JO de 2004 à 2016."},
+      {q:"Quelle ville a accueilli les premiers JO modernes en 1896 ?",opts:["Athènes","Paris","Londres","Stockholm"],ans:0,exp:"Les premiers JO modernes ont eu lieu à Athènes en 1896.",hint:"C'est la capitale de la Grèce, berceau des Jeux antiques."},
+      {q:"Quelle équipe de NBA est surnommée 'les Bulls' ?",opts:["Chicago","Boston","Los Angeles","New York"],ans:0,exp:"Les Chicago Bulls sont l'équipe NBA d'Illinois.",hint:"Michael Jordan a joué dans cette équipe."},
+      {q:"Combien de couloirs y a-t-il dans un stade d'athlétisme standard ?",opts:["8","6","10","9"],ans:0,exp:"Une piste d'athlétisme standard comporte 8 couloirs.",hint:"Le chiffre est supérieur à 7."},
+      {q:"Quel pays a inventé le sport du sumo ?",opts:["Japon","Chine","Corée","Mongolie"],ans:0,exp:"Le sumo est un sport de lutte japonais avec plus de 1 500 ans d'histoire.",hint:"Les combattants portent un mawashi."},
+      {q:"Quel est le terme pour un score de zéro au tennis ?",opts:["Love","Zero","Nil","Nought"],ans:0,exp:"Au tennis, 'love' désigne zéro point.",hint:"Ce terme anglais signifie 'amour' en français."},
+      {q:"En quelle année les femmes ont-elles participé aux JO pour la première fois ?",opts:["1900","1920","1908","1924"],ans:0,exp:"Les premières femmes ont participé aux JO de Paris en 1900, dans le tennis et le golf.",hint:"C'était lors des deuxièmes Jeux Olympiques modernes."},
+      {q:"Quel sprinter jamaïcain détient le record du monde du 100m ?",opts:["Usain Bolt","Asafa Powell","Yohan Blake","Shelly-Ann Fraser"],ans:0,exp:"Usain Bolt détient le record du monde du 100m avec 9,58 secondes.",hint:"Son nom de famille signifie 'éclair' en anglais."},
+      {q:"En cricket, qu'est-ce qu'un 'googly' ?",opts:["Lancer trompeur","Type de batte","Score parfait","Faute de frappe"],ans:0,exp:"Un googly est une balle de cricket qui tourne de manière inattendue.",hint:"C'est une technique de lancer trompeur."},
+      {q:"Quelle est la hauteur officielle du filet au volleyball ?",opts:["2,43m (H) / 2,24m (F)","2,40m / 2,20m","2,50m / 2,30m","2,35m / 2,15m"],ans:0,exp:"Le filet de volleyball mesure 2,43m pour les hommes et 2,24m pour les femmes.",hint:"La hauteur diffère entre hommes et femmes."},
+    ],
+    difficile:[
+      {q:"Quel est le coefficient de difficulté maximal en gymnastique artistique ?",opts:["Il est illimité depuis 2006","6,0","10,0","8,0"],ans:0,exp:"Depuis 2006, la FIG a supprimé le score parfait de 10.0. Le D-score est théoriquement illimité.",hint:"Nadia Comaneci a eu le premier 10 parfait en 1976."},
+      {q:"En quel sport pratique-t-on le 'epée', le 'fleuret' et le 'sabre' ?",opts:["Escrime","Kendo","Iaïdo","Wushu"],ans:0,exp:"L'escrime olympique comprend trois armes : le fleuret, l'épée et le sabre.",hint:"Ce sport est aussi appelé 'escrime' ou 'maniement de l'épée'."},
+      {q:"Quel pays a remporté le plus de médailles d'or aux JO de l'été ?",opts:["États-Unis","Russie/URSS","Chine","Grande-Bretagne"],ans:0,exp:"Les États-Unis dominent le bilan total des médailles d'or olympiques.",hint:"Ce pays est le plus grand consommateur de fast-food au monde."},
+      {q:"Qu'est-ce que le 'Fosbury Flop' en athlétisme ?",opts:["Technique de saut en hauteur","Style de lancement de disque","Technique de sprint","Départ en natation"],ans:0,exp:"Dick Fosbury a révolutionné le saut en hauteur aux JO 1968 avec son saut dos tourné à la barre.",hint:"C'est une technique de saut en hauteur introduite en 1968."},
+      {q:"Quelle équipe a remporté le plus de Ligues des Champions ?",opts:["Real Madrid","AC Milan","Bayern Munich","Liverpool"],ans:0,exp:"Le Real Madrid a remporté 14 fois la Ligue des Champions.",hint:"C'est un club de football espagnol."},
+      {q:"En boxe, combien de rounds comprend un combat de championnat du monde ?",opts:["12","15","10","8"],ans:0,exp:"Depuis 1988, les championnats du monde de boxe se disputent sur 12 rounds.",hint:"Le chiffre est entre 10 et 15."},
+      {q:"Quel est l'équipement distinctif du polo ?",opts:["Maillet à long manche","Bâton coudé","Crosse incurvée","Raquette spéciale"],ans:0,exp:"Le polo se joue à cheval avec un maillet à long manche flexible.",hint:"Ce sport se joue à cheval."},
+      {q:"En curling, quel instrument mesure la distance des pierres ?",opts:["Le 'measuring device'","Le 'skip'","Le 'hammer'","Le 'broom'"],ans:0,exp:"Un 'measuring device' détermine quelle équipe a la pierre la plus proche du centre.",hint:"C'est un outil de mesure précis."},
+      {q:"Quel est le record du monde du saut en longueur depuis 1991 ?",opts:["8,95m par Mike Powell","8,90m par Bob Beamon","9,01m par Carl Lewis","8,87m par Ivan Pedroso"],ans:0,exp:"Mike Powell a établi le record avec 8,95m aux Mondiaux de Tokyo en 1991.",hint:"Le record est inférieur à 9 mètres."},
+      {q:"En voile, que désigne le terme 'mayday' ?",opts:["Signal international de détresse","Type de manœuvre","Direction du vent","Nom d'un nœud"],ans:0,exp:"Mayday (du français 'm'aidez') est le signal international de détresse radio.",hint:"Ce terme vient du français 'm'aidez'."},
+    ]
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════
+   ÉTAPE 4 — INSTRUCTION 1 : FONCTIONNALITÉS IDENTIFIÉES
+   ① Jokers : 50:50 | Indice | Double Chance
+   ② Classement (Leaderboard) avec session de jeu
+   ③ Multiplicateur de série (×1, ×1.5, ×2)
+   ④ Badges / Achievements débloqués selon performance
+   ⑤ Graphique de progression par question
+   ⑥ Mode Sudden Death
+════════════════════════════════════════════════════════════════ */
+
+/* ── Barème ── */
+const SCORING = {
+  facile:   {base:100, label:'😊 Facile'},
+  moyen:    {base:150, label:'🎯 Moyen'},
+  difficile:{base:200, label:'🔥 Difficile'},
+};
+
+/* ── Définition des Achievements avec descriptions complètes ── */
+const ACHIEVEMENTS = [
+  {id:'perfect',    icon:'🏆', label:'Score parfait',       desc:'10/10 — aucune erreur !',                         color:'ach-gold',   test:(s)=>s.pct===100},
+  {id:'speed',      icon:'⚡', label:'Éclair',              desc:'Réponse moyenne ≤ 5 s avec ≥ 60 % de réussite',   color:'ach-cyan',   test:(s)=>s.avgTime<=5 && s.pct>=60},
+  {id:'streak5',    icon:'🔥', label:'Série enflammée',     desc:'5 bonnes réponses consécutives ou plus',           color:'ach-red',    test:(s)=>s.maxStreak>=5},
+  {id:'noLifeline', icon:'💪', label:'Sans filet',          desc:'≥ 70 % sans utiliser aucun joker',                color:'ach-purple', test:(s)=>s.lifesUsed===0 && s.pct>=70},
+  {id:'scholar',    icon:'🎓', label:'Grand Savant',        desc:'≥ 80 % de bonnes réponses',                       color:'ach-green',  test:(s)=>s.pct>=80},
+  {id:'survivor',   icon:'💀', label:'Survivant',           desc:'10/10 en mode Sudden Death',                      color:'ach-red',    test:(s)=>s.mode==='sudden_death' && s.pct===100},
+  {id:'quick10',    icon:'🚀', label:'Quiz Éclair',         desc:'Score parfait en moins de 8 s par question',      color:'ach-cyan',   test:(s)=>s.pct===100 && s.avgTime<=8},
+  {id:'comeback',   icon:'🔄', label:'Comeback',            desc:'≥ 60 % en commençant par une mauvaise réponse',   color:'ach-pink',   test:(s)=>s.pct>=60 && s.answered[0]?.correct===false},
+];
+
+/* ── Classement session (stocké en mémoire) ── */
+let leaderboard = [];
+
+/* ── État global ── */
+const state = {
+  category:null, difficulty:'moyen', mode:'normal',
+  questions:[], current:0, score:0, answered:[],
+  startTime:null, questionStartTime:null,
+  timerInterval:null, timeLeft:20, maxTime:20,
+  streak:0, maxStreak:0, skipped:0, timeData:[],
+  /* Jokers */
+  lifelines:{fiftyfifty:true, hint:true, doublechance:true},
+  dcActive:false,          // double chance en cours
+  dcFirstWrong:false,      // premier mauvais choix avec DC
+  lifesUsed:0,             // nb jokers utilisés
+  /* Mode */
+  isSuddenDeath:false,
+  sdTriggered:false,
+};
+
+/* ════════════════════════════════════════════════════════════════
+   UTILITAIRES
+════════════════════════════════════════════════════════════════ */
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   AUDITEURS — ACCUEIL
+════════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.cat-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.category=btn.dataset.cat;
+    const sb=document.getElementById('startBtn');
+    sb.disabled=false;
+    sb.textContent='Commencer le Quiz →';
+  });
+});
+document.querySelectorAll('.diff-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.difficulty=btn.dataset.diff;
+  });
+});
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    state.mode=btn.dataset.mode;
+  });
+});
+document.getElementById('startBtn').addEventListener('click',startQuiz);
+document.getElementById('nextBtn').addEventListener('click',nextQuestion);
+document.getElementById('skipBtn').addEventListener('click',skipQuestion);
+document.getElementById('retryBtn').addEventListener('click',retryQuiz);
+document.getElementById('homeBtn').addEventListener('click',goHome);
+document.getElementById('tabStats').addEventListener('click',()=>showTab('stats'));
+document.getElementById('tabChart').addEventListener('click',()=>showTab('chart'));
+document.getElementById('tabReview').addEventListener('click',()=>showTab('review'));
+document.getElementById('tabLB').addEventListener('click',()=>showTab('lb'));
+
+/* ── Jokers ── */
+document.getElementById('ll5050').addEventListener('click',useLifeline5050);
+document.getElementById('llHint').addEventListener('click',useLifelineHint);
+document.getElementById('llDC').addEventListener('click',useLifelineDC);
+
+/* ── Sudden Death buttons ── */
+document.getElementById('sdHome').addEventListener('click',()=>{document.getElementById('sdOverlay').classList.add('hidden');goHome()});
+document.getElementById('sdResults').addEventListener('click',()=>{document.getElementById('sdOverlay').classList.add('hidden');showResults()});
+
+/* ════════════════════════════════════════════════════════════════
+   DÉMARRAGE
+════════════════════════════════════════════════════════════════ */
+function startQuiz(){
+  const pool=QUESTIONS[state.category][state.difficulty];
+  state.questions=shuffle(pool).slice(0,10);
+  state.current=0; state.score=0; state.answered=[];
+  state.streak=0; state.maxStreak=0; state.skipped=0; state.timeData=[];
+  state.lifelines={fiftyfifty:true,hint:true,doublechance:true};
+  state.dcActive=false; state.lifesUsed=0; state.sdTriggered=false;
+  state.isSuddenDeath=(state.mode==='sudden_death');
+  state.startTime=Date.now();
+
+  updateLifelineButtons();
+  showScreen('quizScreen');
+  buildProgressDots();
+  showQuestion();
+}
+
+/* ── Points de progression ── */
+function buildProgressDots(){
+  const c=document.getElementById('progressDots');
+  c.innerHTML='';
+  state.questions.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='pdot'+(i===0?' current':'');
+    d.id='dot-'+i;
+    c.appendChild(d);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   AFFICHAGE QUESTION
+════════════════════════════════════════════════════════════════ */
+function showQuestion(){
+  const q=state.questions[state.current];
+  const num=state.current+1, tot=state.questions.length;
+
+  document.getElementById('quizCatTag').textContent=state.category.charAt(0).toUpperCase()+state.category.slice(1);
+  document.getElementById('qCounter').textContent=`Q ${num} / ${tot}`;
+  document.getElementById('liveScore').textContent=state.score;
+  document.getElementById('questionNum').textContent=`Question ${num}`;
+  document.getElementById('questionText').textContent=q.q;
+
+  /* Génération dynamique des options */
+  const grid=document.getElementById('optionsGrid');
+  grid.innerHTML='';
+  const letters=['A','B','C','D'];
+  q.opts.forEach((opt,i)=>{
+    const btn=document.createElement('button');
+    btn.className='option-btn';
+    btn.id='opt-'+i;
+    btn.innerHTML=`<span class="opt-letter">${letters[i]}</span><span>${opt}</span>`;
+    btn.addEventListener('click',()=>selectAnswer(i));
+    grid.appendChild(btn);
+  });
+
+  /* Reset UI */
+  const panel=document.getElementById('feedbackPanel');
+  panel.classList.remove('show','feedback-correct','feedback-wrong','feedback-timeout');
+  document.getElementById('hintPanel').classList.remove('show');
+  document.getElementById('hintText').textContent='';
+  document.getElementById('dcBadge').classList.remove('show');
+  document.getElementById('nextBtn').disabled=true;
+  document.getElementById('skipBtn').disabled=false;
+  document.getElementById('pointsBadgeWrap').innerHTML='';
+  state.dcActive=false;
+  state.dcFirstWrong=false;
+
+  /* Dots */
+  document.querySelectorAll('.pdot').forEach((d,i)=>{
+    d.classList.remove('current');
+    if(i===state.current) d.classList.add('current');
+  });
+
+  /* Streak badge */
+  updateStreakBadge();
+
+  startTimer();
+  state.questionStartTime=Date.now();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TIMER
+════════════════════════════════════════════════════════════════ */
+function startTimer(){
+  clearInterval(state.timerInterval);
+  state.timeLeft=state.maxTime;
+  updateTimerUI();
+  state.timerInterval=setInterval(()=>{
+    state.timeLeft--;
+    updateTimerUI();
+    if(state.timeLeft<=0){clearInterval(state.timerInterval);autoTimeout();}
+  },1000);
+}
+function updateTimerUI(){
+  const pct=(state.timeLeft/state.maxTime)*100;
+  const bar=document.getElementById('timerBar');
+  bar.style.width=pct+'%';
+  bar.className='timer-bar'+(state.timeLeft<=5?' warning':'');
+  document.getElementById('timerText').textContent=state.timeLeft+'s';
+}
+function autoTimeout(){
+  const q=state.questions[state.current];
+  document.querySelectorAll('.option-btn').forEach((btn,i)=>{btn.disabled=true;if(i===q.ans)btn.classList.add('correct');});
+  recordAnswer(-1,false,0);
+  showFeedback('timeout',q,-1,0);
+  document.getElementById('nextBtn').disabled=false;
+  document.getElementById('skipBtn').disabled=true;
+  if(state.isSuddenDeath){triggerSuddenDeath('Temps écoulé !');}
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ÉTAPE 4 — INSTRUCTION 2 : JOKERS (BOUÉES DE SAUVETAGE)
+════════════════════════════════════════════════════════════════ */
+
+/* ── Joker 50:50 ── */
+function useLifeline5050(){
+  if(!state.lifelines.fiftyfifty) return;
+  state.lifelines.fiftyfifty=false;
+  state.lifesUsed++;
+  updateLifelineButtons();
+  const q=state.questions[state.current];
+  const wrongIdxs=[];
+  for(let i=0;i<q.opts.length;i++){if(i!==q.ans)wrongIdxs.push(i);}
+  const toElim=shuffle(wrongIdxs).slice(0,2);
+  toElim.forEach(i=>{
+    const btn=document.getElementById('opt-'+i);
+    if(btn){btn.classList.add('eliminated');btn.disabled=true;}
+  });
+  showToast('🎯','Joker 50:50 utilisé !','Deux mauvaises réponses ont été éliminées.','ach-cyan');
+}
+
+/* ── Joker Indice ── */
+function useLifelineHint(){
+  if(!state.lifelines.hint) return;
+  state.lifelines.hint=false;
+  state.lifesUsed++;
+  updateLifelineButtons();
+  const q=state.questions[state.current];
+  document.getElementById('hintText').textContent=q.hint||'Pas d\'indice disponible pour cette question.';
+  document.getElementById('hintPanel').classList.add('show');
+  showToast('💡','Indice révélé !','Analysez l\'indice avec attention.','ach-gold');
+}
+
+/* ── Joker Double Chance ── */
+function useLifelineDC(){
+  if(!state.lifelines.doublechance) return;
+  state.lifelines.doublechance=false;
+  state.lifesUsed++;
+  state.dcActive=true;
+  updateLifelineButtons();
+  document.getElementById('dcBadge').classList.add('show');
+  showToast('💗','Double Chance activée !','Vous avez le droit à une 2ème tentative.','ach-pink');
+}
+
+function updateLifelineButtons(){
+  const b5050 =document.getElementById('ll5050');
+  const bHint =document.getElementById('llHint');
+  const bDC   =document.getElementById('llDC');
+  b5050.disabled=!state.lifelines.fiftyfifty;
+  bHint.disabled=!state.lifelines.hint;
+  bDC.disabled  =!state.lifelines.doublechance;
+  document.getElementById('dot5050').style.display=state.lifelines.fiftyfifty?'none':'block';
+  document.getElementById('dotHint').style.display=state.lifelines.hint?'none':'block';
+  document.getElementById('dotDC').style.display  =state.lifelines.doublechance?'none':'block';
+  /* Masquer jokers en Sudden Death ? Non — ils restent disponibles. */
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SÉLECTION D'UNE RÉPONSE
+════════════════════════════════════════════════════════════════ */
+function selectAnswer(idx){
+  const q=state.questions[state.current];
+  const correct=(idx===q.ans);
+
+  /* ── Double Chance : premier mauvais essai ── */
+  if(!correct && state.dcActive && !state.dcFirstWrong){
+    state.dcFirstWrong=true;
+    const btn=document.getElementById('opt-'+idx);
+    if(btn){btn.classList.add('wrong');btn.disabled=true;}
+    showFeedback('wrong_dc',q,idx,0);
+    document.getElementById('dcBadge').classList.remove('show');
+    /* Ne pas terminer la question, laisser un autre choix */
+    return;
+  }
+
+  /* ── Réponse finale ── */
+  clearInterval(state.timerInterval);
+  const elapsed=(Date.now()-state.questionStartTime)/1000;
+  state.timeData.push(elapsed);
+
+  document.querySelectorAll('.option-btn').forEach((btn,i)=>{
+    btn.disabled=true;
+    if(i===q.ans) btn.classList.add('correct');
+    if(i===idx && !correct) btn.classList.add('wrong');
+    if(i===idx && correct)  btn.classList.add('selected-correct');
+    if(i===idx && !correct) btn.classList.add('selected-wrong');
+  });
+
+  state.dcActive=false;
+
+  let pointsEarned=0;
+  if(correct){
+    /* ── Étape 3 Instruction 1 : calcul des points ── */
+    pointsEarned=calculatePoints();
+    state.score+=pointsEarned;
+    state.streak++;
+    if(state.streak>state.maxStreak) state.maxStreak=state.streak;
+
+    /* Mise à jour score avec animation */
+    document.getElementById('liveScore').textContent=state.score;
+    const sd=document.getElementById('scoreDisplay');
+    sd.classList.remove('bump');void sd.offsetWidth;sd.classList.add('bump');
+  } else {
+    state.streak=0;
+  }
+
+  updateStreakBadge();
+  recordAnswer(idx,correct,pointsEarned);
+  showFeedback(correct?'correct':'wrong',q,idx,pointsEarned);
+  document.getElementById('nextBtn').disabled=false;
+  document.getElementById('skipBtn').disabled=true;
+
+  const dot=document.getElementById('dot-'+state.current);
+  dot.classList.remove('current');
+  dot.classList.add(correct?'correct':'wrong');
+
+  /* ── Mode Sudden Death ── */
+  if(!correct && state.isSuddenDeath){
+    setTimeout(()=>triggerSuddenDeath('Vous avez répondu incorrectement.'),800);
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CALCUL DES POINTS avec multiplicateur de série
+════════════════════════════════════════════════════════════════ */
+function calculatePoints(){
+  const base=SCORING[state.difficulty].base;
+  const timeBonus=Math.max(0,Math.floor((state.timeLeft/state.maxTime)*50));
+  /* ── Étape 4 : multiplicateur de streak ── */
+  let streakMult=1;
+  if(state.streak>=7) streakMult=2;
+  else if(state.streak>=3) streakMult=1.5;
+  return Math.round((base+timeBonus)*streakMult);
+}
+
+/* ── Streak badge ── */
+function updateStreakBadge(){
+  const badge=document.getElementById('streakBadge');
+  const multEl=document.getElementById('streakMult');
+  if(state.streak>=3){
+    const m=state.streak>=7?2:1.5;
+    multEl.textContent=m;
+    badge.classList.add('visible');
+  } else {
+    badge.classList.remove('visible');
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ENREGISTREMENT & FEEDBACK
+════════════════════════════════════════════════════════════════ */
+function recordAnswer(idx,correct,points){
+  state.answered.push({q:state.questions[state.current],selected:idx,correct,points});
+}
+
+function showFeedback(type,q,idx,points){
+  const panel  =document.getElementById('feedbackPanel');
+  const icon   =document.getElementById('feedbackIcon');
+  const title  =document.getElementById('feedbackTitle');
+  const explain=document.getElementById('feedbackExplain');
+  const badge  =document.getElementById('pointsBadgeWrap');
+
+  panel.classList.remove('feedback-correct','feedback-wrong','feedback-timeout');
+  badge.innerHTML='';
+
+  if(type==='correct'){
+    panel.classList.add('feedback-correct');
+    icon.textContent='✅';
+    title.textContent='Bonne réponse !';
+    title.className='feedback-title correct-text';
+    let streakInfo='';
+    if(state.streak>=7)      streakInfo=' — Multiplicateur ×2 actif 🔥🔥';
+    else if(state.streak>=3) streakInfo=' — Multiplicateur ×1.5 actif 🔥';
+    badge.innerHTML=`<div class="points-badge">+${points} pts${streakInfo}</div>`;
+  } else if(type==='wrong_dc'){
+    panel.classList.add('feedback-wrong');
+    icon.textContent='💗';
+    title.textContent='Incorrect ! Essayez encore (Double Chance active)…';
+    title.className='feedback-title wrong-text';
+    explain.textContent='';
+    panel.classList.add('show');
+    return;
+  } else if(type==='wrong'){
+    panel.classList.add('feedback-wrong');
+    icon.textContent='❌';
+    title.textContent=`Incorrect — Réponse : « ${q.opts[q.ans]} »`;
+    title.className='feedback-title wrong-text';
+  } else {
+    panel.classList.add('feedback-timeout');
+    icon.textContent='⏱️';
+    title.textContent=`Temps écoulé — Réponse : « ${q.opts[q.ans]} »`;
+    title.className='feedback-title timeout-text';
+  }
+  explain.textContent=q.exp;
+  panel.classList.add('show');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ÉTAPE 4 — MODE SUDDEN DEATH
+════════════════════════════════════════════════════════════════ */
+function triggerSuddenDeath(msg){
+  if(state.sdTriggered) return;
+  state.sdTriggered=true;
+  clearInterval(state.timerInterval);
+  /* Enregistrer la question courante si pas encore enregistrée */
+  if(state.answered.length<=state.current){
+    recordAnswer(state.questions[state.current]?.ans??-1,false,0);
+  }
+  document.getElementById('sdMsg').innerHTML=`${msg}<br><strong>Le quiz se termine ici.</strong><br><small>Vos résultats ont quand même été enregistrés.</small>`;
+  document.getElementById('sdOverlay').classList.remove('hidden');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PASSER / SUIVANT
+════════════════════════════════════════════════════════════════ */
+function skipQuestion(){
+  clearInterval(state.timerInterval);
+  state.skipped++;state.streak=0;
+  const q=state.questions[state.current];
+  document.querySelectorAll('.option-btn').forEach((btn,i)=>{btn.disabled=true;if(i===q.ans)btn.classList.add('correct');});
+  recordAnswer(-2,false,0);
+  const dot=document.getElementById('dot-'+state.current);
+  dot.classList.remove('current');dot.classList.add('wrong');
+  showFeedback('wrong',q,-2,0);
+  document.getElementById('nextBtn').disabled=false;
+  document.getElementById('skipBtn').disabled=true;
+  updateStreakBadge();
+}
+
+function nextQuestion(){
+  state.current++;
+  if(state.current>=state.questions.length) showResults();
+  else showQuestion();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RÉSULTATS
+════════════════════════════════════════════════════════════════ */
+function showResults(){
+  clearInterval(state.timerInterval);
+
+  const nbCorrect=state.answered.filter(a=>a.correct).length;
+  const total=state.answered.length||state.questions.length;
+  const pct=Math.round((nbCorrect/total)*100);
+  const avgTime=state.timeData.length>0?Math.round(state.timeData.reduce((a,b)=>a+b,0)/state.timeData.length):0;
+
+  /* Enregistrement classement */
+  const entry={
+    name: `Partie ${leaderboard.length+1}`,
+    score: state.score,
+    pct,
+    diff: SCORING[state.difficulty].label,
+    mode: state.isSuddenDeath?'💀 SD':'🎮',
+    streak: state.maxStreak,
+    date: new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
+  };
+  leaderboard.push(entry);
+  leaderboard.sort((a,b)=>b.score-a.score);
+
+  showScreen('resultsScreen');
+
+  /* Anneau */
+  const ring=document.getElementById('scoreRing');
+  const circum=2*Math.PI*75; // r=75
+  const dashOffset=circum-(pct/100)*circum;
+  const ringColor=pct>=80?'#10b981':pct>=50?'#f59e0b':'#ef4444';
+  ring.style.strokeDasharray=circum;
+  ring.style.stroke=ringColor;
+  setTimeout(()=>{ring.style.strokeDashoffset=dashOffset;},100);
+
+  /* % animé */
+  let displayed=0;
+  const interval=setInterval(()=>{
+    displayed=Math.min(displayed+2,pct);
+    document.getElementById('scorePct').textContent=displayed+'%';
+    if(displayed>=pct) clearInterval(interval);
+  },20);
+
+  /* Titre */
+  let rTitle,rSub;
+  if(pct>=90)     {rTitle='🏆 Extraordinaire !';rSub=`Expert absolu ! Score : ${state.score} pts`}
+  else if(pct>=75){rTitle='⭐ Excellent travail !';rSub=`Très belle performance ! Score : ${state.score} pts`}
+  else if(pct>=60){rTitle='👍 Bien joué !';rSub=`Vous vous en êtes bien sorti ! Score : ${state.score} pts`}
+  else if(pct>=40){rTitle='📚 Peut mieux faire';rSub=`Continuez à apprendre ! Score : ${state.score} pts`}
+  else            {rTitle='💪 Courage !';rSub=`Réessayez, vous pouvez faire mieux ! Score : ${state.score} pts`}
+
+  document.getElementById('resultTitle').textContent=rTitle;
+  document.getElementById('resultSubtitle').textContent=rSub;
+  document.getElementById('finalScoreValue').textContent=state.score;
+  document.getElementById('diffLabel').textContent=SCORING[state.difficulty].label;
+  document.getElementById('modeLabel').textContent=state.isSuddenDeath?'💀 Sudden Death':'🎮 Normal';
+  document.getElementById('correctCount').textContent=nbCorrect;
+  document.getElementById('wrongCount').textContent=total-nbCorrect;
+  document.getElementById('timeUsed').textContent=avgTime+'s';
+
+  /* Streak */
+  if(state.maxStreak>=3){
+    document.getElementById('streakBannerRes').style.display='flex';
+    const mult=state.maxStreak>=7?'×2':'×1.5';
+    document.getElementById('streakTextRes').textContent=`🎯 Meilleure série : ${state.maxStreak} bonnes réponses consécutives ! Multiplicateur ${mult} appliqué sur ces réponses.`;
+  } else {
+    document.getElementById('streakBannerRes').style.display='none';
+  }
+
+  /* ── Étape 4 : Achievements ── */
+  const stats={pct,avgTime,maxStreak:state.maxStreak,lifesUsed:state.lifesUsed,mode:state.mode,answered:state.answered};
+  buildAchievements(stats);
+
+  /* ── Étape 4 : Graphique ── */
+  buildChart();
+
+  /* Révision */
+  buildReviewList();
+
+  /* Classement */
+  buildLeaderboard();
+
+  if(pct>=80) launchConfetti();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ÉTAPE 4 — INSTRUCTION 2 : ACHIEVEMENTS
+════════════════════════════════════════════════════════════════ */
+function buildAchievements(stats){
+  const grid=document.getElementById('achievementsGrid');
+  grid.innerHTML='';
+  let anyUnlocked=false;
+  let toastDelay=0;
+
+  ACHIEVEMENTS.forEach((ach,i)=>{
+    const unlocked=ach.test(stats);
+    if(unlocked) anyUnlocked=true;
+    const el=document.createElement('div');
+    el.className=`ach-badge ${unlocked?'unlocked '+ach.color:'locked'}`;
+    el.style.animationDelay=`${i*0.08}s`;
+    el.title=unlocked?`✅ Débloqué — ${ach.desc}`:`🔒 Condition : ${ach.desc}`;
+    el.innerHTML=`<span class="ach-icon">${ach.icon}</span><span>${ach.label}</span>`;
+    grid.appendChild(el);
+    if(unlocked){
+      setTimeout(()=>showToast(ach.icon,`Badge débloqué : ${ach.label}`,ach.desc,'ach'),toastDelay*600);
+      toastDelay++;
+    }
+  });
+
+  if(!anyUnlocked){
+    grid.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px">Aucun badge débloqué cette partie. Passez votre souris sur les badges verrouillés pour voir les conditions !</div>';
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ÉTAPE 4 — INSTRUCTION 2 : GRAPHIQUE DE PROGRESSION
+════════════════════════════════════════════════════════════════ */
+function buildChart(){
+  const bars=document.getElementById('chartBars');
+  bars.innerHTML='';
+  const maxTime=Math.max(...state.timeData,1);
+
+  state.answered.forEach((ans,i)=>{
+    const wrap=document.createElement('div');
+    wrap.className='chart-bar-wrap';
+    const bar=document.createElement('div');
+    const t=state.timeData[i]||0;
+    const h=Math.max(8,Math.round((t/maxTime)*70));
+    bar.className='chart-bar '+(ans.correct?'bar-correct':ans.selected===-2?'bar-skip':'bar-wrong');
+    bar.style.height='4px';
+    bar.title=`Q${i+1} — ${ans.correct?'✅':ans.selected===-2?'⏭️':'❌'} — ${t.toFixed(1)}s`;
+    const label=document.createElement('div');
+    label.className='chart-label';
+    label.textContent=(i+1).toString();
+    wrap.appendChild(bar);
+    wrap.appendChild(label);
+    bars.appendChild(wrap);
+    setTimeout(()=>{bar.style.height=h+'px';},100+i*60);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ÉTAPE 4 — INSTRUCTION 2 : CLASSEMENT
+════════════════════════════════════════════════════════════════ */
+function buildLeaderboard(){
+  const list=document.getElementById('leaderboardList');
+  list.innerHTML='';
+
+  if(leaderboard.length===0){
+    list.innerHTML='<div class="lb-empty">🏆 Aucune partie enregistrée pour l\'instant.<br>Terminez votre premier quiz pour apparaître ici !<br><small style="font-size:11px;opacity:.6">Le classement est conservé pendant toute la session.</small></div>';
+    return;
+  }
+
+  const top10=leaderboard.slice(0,10);
+  const currentIdx=top10.findIndex(e=>e===leaderboard[leaderboard.length-1]);
+
+  top10.forEach((entry,rank)=>{
+    const el=document.createElement('div');
+    const isCurrent=(rank===currentIdx);
+    el.className='lb-entry'+(isCurrent?' is-current':'');
+    const rankIcons=['🥇','🥈','🥉'];
+    const rankHtml=rank<3
+      ?`<span class="lb-rank ${['gold','silver','bronze'][rank]}">${rankIcons[rank]}</span>`
+      :`<span class="lb-rank">${rank+1}</span>`;
+    el.innerHTML=`
+      ${rankHtml}
+      <div class="lb-info">
+        <div class="lb-name">${entry.name}${isCurrent?' <span style="color:var(--accent);font-size:11px;font-weight:600"> ← vous</span>':''}</div>
+        <div class="lb-meta">${entry.diff} · ${entry.mode} · Série max : ${entry.streak} 🔥 · ${entry.pct}% réussite · ${entry.date}</div>
+      </div>
+      <div class="lb-score">★ ${entry.score.toLocaleString('fr-FR')}</div>
+    `;
+    list.appendChild(el);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RÉVISION
+════════════════════════════════════════════════════════════════ */
+function buildReviewList(){
+  const reviewList=document.getElementById('reviewList');
+  reviewList.innerHTML='';
+  const letters=['A','B','C','D'];
+  state.answered.forEach((ans,i)=>{
+    const item=document.createElement('div');
+    item.className='review-item '+(ans.correct?'correct-item':'wrong-item');
+    let statusHtml;
+    if(ans.correct) statusHtml=`<span class="review-status ok">✅ Correct +${ans.points} pts</span>`;
+    else if(ans.selected===-2) statusHtml=`<span class="review-status sk">⏭️ Passée</span>`;
+    else statusHtml=`<span class="review-status ko">❌ Incorrect 0 pt</span>`;
+    const answersHtml=ans.q.opts.map((opt,j)=>{
+      let cls='neutral-ans',icon='○';
+      if(j===ans.q.ans){cls='correct-ans';icon='✓';}
+      if(j===ans.selected&&j!==ans.q.ans){cls='wrong-ans';icon='✗';}
+      return `<div class="review-ans ${cls}"><span class="review-num">${letters[j]}</span>${icon} ${opt}</div>`;
+    }).join('');
+    item.innerHTML=`${statusHtml}<div class="review-q">${i+1}. ${ans.q.q}</div><div class="review-answers">${answersHtml}</div><div class="review-exp"><strong>💡 Explication :</strong> ${ans.q.exp}</div>`;
+    reviewList.appendChild(item);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ONGLETS
+════════════════════════════════════════════════════════════════ */
+function showTab(name){
+  ['stats','chart','review','lb'].forEach(t=>{
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active',t===name);
+    document.getElementById(t+'Tab').classList.toggle('active',t===name);
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ÉTAPE 4 — INSTRUCTION 2 : TOAST DE NOTIFICATION
+════════════════════════════════════════════════════════════════ */
+let toastQueue=[];
+function showToast(icon,title,sub,colorClass){
+  /* Limiter à 3 toasts simultanés */
+  const container=document.getElementById('toastContainer');
+  if(container.children.length>=3) return;
+
+  const toast=document.createElement('div');
+  toast.className='toast';
+  toast.innerHTML=`<div class="toast-icon">${icon}</div><div class="toast-body"><div class="toast-title">${title}</div><div class="toast-sub">${sub}</div></div>`;
+  container.appendChild(toast);
+
+  setTimeout(()=>{
+    toast.classList.add('toast-out');
+    setTimeout(()=>toast.remove(),400);
+  },3000);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   REJOUER / ACCUEIL
+════════════════════════════════════════════════════════════════ */
+function retryQuiz(){startQuiz();}
+function goHome(){
+  clearInterval(state.timerInterval);
+  document.getElementById('sdOverlay').classList.add('hidden');
+  showScreen('homeScreen');
+  document.getElementById('confettiContainer').innerHTML='';
+  document.getElementById('streakBannerRes').style.display='none';
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CONFETTIS
+════════════════════════════════════════════════════════════════ */
+function launchConfetti(){
+  const colors=['#7c3aed','#06b6d4','#f59e0b','#10b981','#ef4444','#ec4899'];
+  const container=document.getElementById('confettiContainer');
+  container.innerHTML='';
+  for(let i=0;i<80;i++){
+    const p=document.createElement('div');
+    p.className='confetti-piece';
+    const c=colors[Math.floor(Math.random()*colors.length)];
+    const l=Math.random()*100, dur=1.5+Math.random()*2, del=Math.random()*1.5, sz=6+Math.random()*10;
+    p.style.cssText=`left:${l}%;background:${c};width:${sz}px;height:${sz}px;animation-duration:${dur}s;animation-delay:${del}s;border-radius:${Math.random()>.5?'50%':'2px'};`;
+    container.appendChild(p);
+    setTimeout(()=>p.remove(),(dur+del)*1000+500);
+  }
+}
+</script>
+</body>
+</html>
